@@ -1,17 +1,23 @@
 from Augmentor import glob
 from Augmentor import ImageDetails
+from Augmentor import ImageFormat
 from Augmentor import Image
 from Augmentor import GithubFlavoredMarkdownTable
 from Augmentor import gcd
 
 
 class ImageSource(object):
-    def __init__(self, root_path='.'):
+    def __init__(self, root_path=None, image=None):
+
         self.root_path = root_path
         self.list_of_images = []
-        self.dimensions = {}
         self.file_extension = ('jpg', 'jpeg', 'png', 'bmp')
-        self.scan(root_path)
+        if image is not None:
+            self.list_of_images.append(ImageDetails.ImageDetails(image, image.filename))
+        else:
+            self.scan(root_path)
+        self.dimensions = {}
+        self.image_format = ImageFormat.ImageFormat()
 
     def scan(self, path_to_scan):
         # for root, subdirs, list_of_files in os.walk(path_to_scan):
@@ -41,6 +47,7 @@ class ImageSource(object):
             ['Aspect ratio(s)', self.process_aspect_ratio()],
             ['File type(s)', file_types[1]],
             ['File extension(s)', file_types[0]],
+            ['File format(s)', self.process_file_formats()[0]],
         ]
         table = GithubFlavoredMarkdownTable(table_data)
         print(table.table)
@@ -55,12 +62,21 @@ class ImageSource(object):
 
         return result[:-1]
 
+    def process_file_formats(self):
+        file_formats = {}
+        for image in self.list_of_images:
+            if image.image.mode not in file_formats:
+                file_formats[image.image.mode] = self.image_format.get_format_printable(image.image)
+
+        return [str(', '.join(str(file_format) for file_format in file_formats.values())), str(len(file_formats))]
+        #return 'lol'
+
     def process_filetypes(self):
         file_types = []
-
         for image in self.list_of_images:
             if image.extension not in file_types:
                 file_types.append(image.extension)
+
         return [str(', '.join(str(type[1:]) for type in file_types)), str(len(file_types))]
 
     def process_aspect_ratio(self):
