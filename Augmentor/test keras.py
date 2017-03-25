@@ -87,7 +87,8 @@ y_train = utils.to_categorical(y_train, num_classes)
 
 y_test = utils.to_categorical(y_test, num_classes)
 
-# ??
+
+# ss
 
 
 model = Sequential()
