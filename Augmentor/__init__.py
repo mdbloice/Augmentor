@@ -11,7 +11,7 @@ error, more reproducible, more efficient, and easier to perform.
 
 """
 
-from Pipeline import Pipeline
+#from Pipeline import Pipeline
 
 __author__ = """Marcus D. Bloice"""
 __email__ = 'marcus.bloice@medunigraz.at'
