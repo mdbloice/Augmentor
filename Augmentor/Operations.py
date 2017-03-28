@@ -3,9 +3,9 @@ from __future__ import (absolute_import, division,
 from builtins import *
 
 from PIL import Image, ImageOps
-from .ImageUtilities import extract_paths_and_extensions
+from ImageUtilities import extract_paths_and_extensions
 from math import floor, ceil
-
+from skimage import util
 import os
 import random
 
@@ -409,3 +409,13 @@ class Custom(Operation):
 
     def perform_operation(self, image):
         return self.function_name(image, **self.function_arguments)
+
+class RandomNoise(Operation):
+    def __init__(self, probability):
+        Operation.__init__(self, probability)
+
+    def perform_operation(self, image):
+        noise_types = ["gaussian", "speckle", "poisson", "s&p"]
+
+        return util.random_noise(image, mode=random.choice(noise_types), clip=True)
+
