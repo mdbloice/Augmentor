@@ -1,7 +1,5 @@
 '''Trains a simple convnet on the MNIST dataset.
 
-
-
 Gets to 99.25% test accuracy after 12 epochs
 
 (there is still a lot of margin for parameter tuning).
@@ -14,8 +12,10 @@ Gets to 99.25% test accuracy after 12 epochs
 
 from __future__ import print_function
 
+from PIL import Image
 import numpy as np
-from Operations import RandomNoise
+import Operations as op
+import Pipeline as pipe
 
 from keras.keras.datasets import mnist
 from keras.keras.models import Sequential
@@ -26,9 +26,11 @@ from keras.keras import losses
 from keras.keras import utils
 from keras.keras import backend as K
 
+
+
 data_augmentation = True
 
-batch_size = 1280
+batch_size = 128
 
 num_classes = 2
 
@@ -56,6 +58,7 @@ together = np.array(first_class + second_class)
 
 x_test = x_test[np.reshape(together, together.shape[0])]
 y_test = y_test[np.reshape(together, together.shape[0])]
+
 if K.image_data_format() == 'channels_first':
 
     x_train = x_train.reshape(x_train.shape[0], 3, img_rows, img_cols) # 1 for minst peste tot unde e 3
@@ -71,7 +74,6 @@ else:
     x_test = x_test.reshape(x_test.shape[0], img_rows, img_cols, 3)
 
     input_shape = (img_rows, img_cols, 3)
-
 
 
 x_train = x_train.astype('float32')
@@ -145,12 +147,23 @@ if not data_augmentation:
 
 else:
     print("Using Data Augmentation")
-    new_x_train = np.zeros(([100000,32,32,3]))
-    new_y_train = np.zeros(([100000,2]))
-    rnoiseoperation = RandomNoise(0.9)
+
+    gauss = op.NoiseGaussian(0.25, 0.2, 0.5, 0.02, 0.80)
+    poiss = op.NoisePoisson(0.25, 0.2, 0.5)
+    pepper = op.NoiseSaltPepper(0.25, 0.4, 0.6)
+    speckle = op.NoiseSpeckle(0.25, 0.2, 0.5, 0.02, 0.80)
+
+
+
+    new_x_train = np.zeros(([20000,32,32,3]))
+    new_y_train = np.zeros(([20000,2]))
+    #rnoiseoperation = RandomNoise(0.9)
     for i in range(x_train.shape[0]):
-        for j in range(0,10): # out of each image do 10 new ones
-            new_x_train[i,:,:,:] = rnoiseoperation.perform_operation(x_train[i,:,:,:])
+        for j in range(0,2): # out of each image do 10 new ones
+            new_x_train[i, :, :, :] = gauss.perform_operation(x_train[i, :, :, :])
+            new_x_train[i, :, :, :] = poiss.perform_operation(new_x_train[i, :, :, :])
+            new_x_train[i, :, :, :] = pepper.perform_operation(new_x_train[i, :, :, :])
+            new_x_train[i, :, :, :] = speckle.perform_operation(new_x_train[i, :, :, :])
             new_y_train[i,:] = y_train[i,:]
 
     # at the end combine the datasets
@@ -174,3 +187,4 @@ else:
     print('Test loss:', score[0])
 
     print('Test accuracy:', score[1])
+

@@ -8,6 +8,7 @@ from math import floor, ceil
 from skimage import util
 import os
 import random
+import numpy as np
 
 # Python 2-3 compatibility - not currently needed.
 # try:
@@ -410,12 +411,92 @@ class Custom(Operation):
     def perform_operation(self, image):
         return self.function_name(image, **self.function_arguments)
 
-class RandomNoise(Operation):
-    def __init__(self, probability):
+
+class NoiseGaussian(Operation):
+    def __init__(self, probability, minMean, maxMean, minVar, maxVar):
         Operation.__init__(self, probability)
 
-    def perform_operation(self, image):
-        noise_types = ["gaussian", "speckle", "poisson", "s&p"]
+        # if the user gives the parameters in wrong order
 
-        return util.random_noise(image, mode=random.choice(noise_types), clip=True)
+        if minMean>maxMean:
+            temp = maxMean
+            maxMean = minMean
+            minMean = temp
+        if minVar>maxVar:
+            temp = maxVar
+            maxVar = minVar
+            minVar = temp
+
+        self.minMean = minMean
+        self.maxMean = maxMean
+        self.minVar = minVar
+        self.maxVar = maxVar
+
+    def perform_operation(self, image):
+
+        return util.random_noise(image, mode="gaussian", clip=True, mean=random.uniform(self.minMean, self.maxMean), var=random.uniform(self.minVar, self.maxVar))
+
+
+class NoiseSpeckle(Operation):
+    def __init__(self, probability, minMean, maxMean, minVar, maxVar):
+        Operation.__init__(self, probability)
+
+        # if the user gives the parameters in wrong order
+
+        if minMean>maxMean:
+            temp = maxMean
+            maxMean = minMean
+            minMean = temp
+        if minVar>maxVar:
+            temp = maxVar
+            maxVar = minVar
+            minVar = temp
+
+        self.minMean = minMean
+        self.maxMean = maxMean
+        self.minVar = minVar
+        self.maxVar = maxVar
+
+    def perform_operation(self, image):
+
+        return util.random_noise(image, mode="speckle", clip=True, mean=random.uniform(self.minMean, self.maxMean), var=random.uniform(self.minVar, self.maxVar))
+
+class NoisePoisson(Operation):
+
+    def __init__(self, probability, minMean, maxMean):
+        Operation.__init__(self, probability)
+
+        # if the user gives the parameters in wrong order
+
+        if minMean>maxMean:
+            temp = maxMean
+            maxMean = minMean
+            minMean = temp
+
+        self.minMean = minMean
+        self.maxMean = maxMean
+
+    def perform_operation(self, image):
+        image_transformed = np.add(image, np.random.poisson(random.uniform(self.minMean, self.maxMean),
+                                               size=(image.shape[0], image.shape[1], image.shape[2])))
+        return np.subtract(image_transformed,np.min(image_transformed))/np.max(image_transformed)
+
+class NoiseSaltPepper(Operation):
+    # amount of salt is a random number percentage between minSaltPercentage and maxSaltPercentage
+    # the pepper amount is 1.0 minus that random number
+    def __init__(self, probability, minSaltPercentage, maxSaltPercentage):
+        Operation.__init__(self, probability)
+
+        # if the user gives the parameters in wrong order
+
+        if minSaltPercentage>maxSaltPercentage:
+            temp = maxSaltPercentage
+            maxSaltPercentage = minSaltPercentage
+            minSaltPercentage = temp
+
+        self.minSaltPercentage = minSaltPercentage
+        self.maxSaltPercentage = maxSaltPercentage
+    def perform_operation(self, image):
+
+        return util.random_noise(image, mode="s&p", clip=True, salt_vs_pepper=random.uniform(self.minSaltPercentage, self.maxSaltPercentage))
 
