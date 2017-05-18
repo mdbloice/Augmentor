@@ -349,7 +349,7 @@ class Pipeline(object):
             operation_index = 0
             for operation in self.operations:
                 print("Index %s:\n\tOperation %s (probability: %s):" % (operation_index, operation, operation.probability))
-                for operation_attribute, operation_value in operation.__dict__.items():
+                for operation_attribute, operation_value in list(operation.__dict__.items()):
                     print("\t\tAttribute: %s (%s)" % (operation_attribute, operation_value))
                 operation_index += 1
             print()
