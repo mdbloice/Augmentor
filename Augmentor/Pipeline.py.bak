@@ -136,7 +136,7 @@ class Pipeline(object):
             try:
                 os.makedirs(abs_output_directory)
             except IOError:
-                print(("Insufficient rights to read or write output directory (%s)" % abs_output_directory))
+                print("Insufficient rights to read or write output directory (%s)" % abs_output_directory)
 
         # Use the ImageUtilities class's scan_directory function to find images in the
         # source_directory folder.
@@ -159,14 +159,14 @@ class Pipeline(object):
                     self.distinct_dimensions.add(opened_image.size)
                     self.distinct_formats.add(opened_image.format)
             except IOError:
-                print(("There is a problem with image %s in your source directory. "
+                print("There is a problem with image %s in your source directory. "
                       "It is unreadable and will not be included when augmenting."
-                      % os.path.basename(augmentor_image.image_path)))
+                      % os.path.basename(augmentor_image.image_path))
                 self.augmentor_images.remove(augmentor_image)
 
         # Finally, we will print some informational messages.
-        print(("Initialised with %s image(s) found in selected directory." % len(self.augmentor_images)))
-        print(("Output directory set to %s." % abs_output_directory))
+        print("Initialised with %s image(s) found in selected directory." % len(self.augmentor_images))
+        print("Output directory set to %s." % abs_output_directory)
 
     def _execute(self, augmentor_image, save_to_disk=True):
         """
@@ -204,7 +204,7 @@ class Pipeline(object):
                 # file_name = "test"
                 image.save(os.path.join(augmentor_image.output_directory, file_name), self.save_format)
             except IOError:
-                print(("Error writing %s." % file_name))
+                print("Error writing %s." % file_name)
 
         return image
 
@@ -343,26 +343,26 @@ class Pipeline(object):
         :return: None
         """
         # TODO: Return this as a dictionary of some kind and print from the dict if in console
-        print(("There are %s operation(s) in the current pipeline." % len(self.operations)))
+        print("There are %s operation(s) in the current pipeline." % len(self.operations))
 
         if len(self.operations) != 0:
             operation_index = 0
             for operation in self.operations:
-                print(("Index %s:\n\tOperation %s (probability: %s):" % (operation_index, operation, operation.probability)))
-                for operation_attribute, operation_value in list(operation.__dict__.items()):
-                    print(("\t\tAttribute: %s (%s)" % (operation_attribute, operation_value)))
+                print("Index %s:\n\tOperation %s (probability: %s):" % (operation_index, operation, operation.probability))
+                for operation_attribute, operation_value in operation.__dict__.items():
+                    print("\t\tAttribute: %s (%s)" % (operation_attribute, operation_value))
                 operation_index += 1
             print()
 
-        print(("There are %s image(s) in the source directory." % len(self.augmentor_images)))
+        print("There are %s image(s) in the source directory." % len(self.augmentor_images))
 
         if len(self.augmentor_images) != 0:
             print("Dimensions:")
             for distinct_dimension in self.distinct_dimensions:
-                print(("\tWidth: %s Height: %s" % (distinct_dimension[0], distinct_dimension[1])))
+                print("\tWidth: %s Height: %s" % (distinct_dimension[0], distinct_dimension[1]))
             print("Formats:")
             for distinct_format in self.distinct_formats:
-                print(("\t %s" % distinct_format))
+                print("\t %s" % distinct_format)
 
         print("\nYou can remove operations using the appropriate index and the remove_operation(index) function.")
 

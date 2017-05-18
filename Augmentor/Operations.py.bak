@@ -1098,7 +1098,7 @@ class Distort(Operation):
         for i in range(vertical_tiles):
             last_column.append((horizontal_tiles-1)+horizontal_tiles*i)
 
-        last_row = list(range((horizontal_tiles * vertical_tiles) - horizontal_tiles, horizontal_tiles * vertical_tiles))
+        last_row = range((horizontal_tiles * vertical_tiles) - horizontal_tiles, horizontal_tiles * vertical_tiles)
 
         polygons = []
         for x1, y1, x2, y2 in dimensions:
