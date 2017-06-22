@@ -283,7 +283,7 @@ class Pipeline(object):
 
         return self.apply_from_path(image_path=image_path, save_to_disk=save_to_disk)
 
-    def apply_from_path(self, image_path, save_to_disk):
+    def apply_from_path(self, image_path, save_to_disk=False):
         # for some reason the method was mentioned, but not implemented yet. So I make one --@arsenyinfo
         return self._execute(AugmentorImage(os.path.abspath(image_path), output_directory=self.output_dir),
                              save_to_disk)
