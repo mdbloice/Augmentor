@@ -73,6 +73,7 @@ class Pipeline(object):
         self.distinct_formats = set()
         # TODO: Refactor this out as we do not use it anymore
         self.ground_truth_image_list = {}
+        self.output_dir = output_directory
 
 
         # Now we populate some fields, which we may need to do again later if another
@@ -281,6 +282,11 @@ class Pipeline(object):
                       DeprecationWarning)
 
         return self.apply_from_path(image_path=image_path, save_to_disk=save_to_disk)
+
+    def apply_from_path(self, image_path, save_to_disk):
+        # for some reason the method was mentioned, but not implemented yet. So I make one --@arsenyinfo
+        return self._execute(AugmentorImage(os.path.abspath(image_path), output_directory=self.output_dir),
+                             save_to_disk)
 
     def sample_with_path(self, image_path, save_to_disk=False):
         raise NotImplementedError("This method is currently not implemented.")
