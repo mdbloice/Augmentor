@@ -2,3 +2,4 @@ Pillow
 future
 tqdm
 numpy
+scikit-image

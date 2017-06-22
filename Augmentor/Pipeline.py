@@ -22,7 +22,8 @@ import os
 import random
 import uuid
 import warnings
-import numbers
+
+from skimage.io import imread
 
 from tqdm import tqdm
 from PIL import Image
@@ -192,7 +193,14 @@ class Pipeline(object):
         self.image_counter += 1  # TODO: See if I can remove this...
 
         if augmentor_image.image_path is not None:
-            image = Image.open(augmentor_image.image_path)
+            try:
+                image = Image.open(augmentor_image.image_path)
+            except OSError:
+                image = imread(augmentor_image.image_path)
+                if image.shape[-1] not in (1, 3):
+                    raise ValueError('Image should contain 1 or 3 channels')
+                image = Image.fromarray(image)
+
         else:
             image = augmentor_image.image_PIL
 
