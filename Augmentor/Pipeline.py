@@ -466,6 +466,34 @@ class Pipeline(object):
 
             yield(X, y)
 
+    def torch_transform(self):
+        """
+        Returns the pipeline as a function that can be used with torchvision.
+
+        .. code-block:: python
+
+            >>> import Augmentor
+            >>> import torchvision
+            >>> p = Augmentor.Pipeline()
+            >>> p.rotate(probability=0.7, max_left_rotate=10, max_right_rotate=10)
+            >>> p.zoom(probability=0.5, min_factor=1.1, max_factor=1.5)
+            >>> transforms = torchvision.transforms.Compose([
+            >>>     p.torch_transform(),
+            >>>     torchvision.transforms.ToTensor(),
+            >>> ])
+
+        :return: The pipeline as a function.
+        """
+        def _transform(image):
+            for operation in self.operations:
+                r = round(random.uniform(0, 1), 1)
+                if r <= operation.probability:
+                    image = operation.perform_operation(image)
+
+            return image
+
+        return _transform
+
     def add_operation(self, operation):
         """
         Add an operation directly to the pipeline. Can be used to add custom
