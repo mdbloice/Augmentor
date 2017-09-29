@@ -29,8 +29,13 @@ import math
 from math import floor, ceil
 
 import numpy as np
-# from skimage import img_as_ubyte
+from skimage import io,transform
+from skimage import img_as_ubyte
+from skimage import img_as_float
 # from skimage import transform
+import scipy
+
+from numpy import linalg as LA
 
 import os
 import random
@@ -1567,6 +1572,81 @@ class RandomErasing(Operation):
         image.paste(rectangle, (random_position_x, random_position_y))
 
         return image
+
+
+class Fancy_PCA(Operation):
+    def __init__(self, probability):
+        Operation.__init__(self, probability, sigma)
+        self.sigma = sigma
+
+    def perform_operation(self, image):
+		(width, height) = image.size
+
+
+		res = np.zeros(shape=(1,3))
+		image_array = np.array(image)
+
+		m=transform.resize(image_array,(width,height,3))
+		arr=m.reshape((height*width),3)
+		res = np.concatenate((res,arr),axis=0)
+		res = np.delete(res, (0), axis=0)
+		# subtracting the mean from each dimension
+		m = res.mean(axis = 0)
+		res = res - m
+		#print(m)
+
+
+		R = np.cov(res, rowvar=False)
+
+		evals, evecs = LA.eigh(R)
+
+		idx = np.argsort(evals)[::-1]
+		evecs = evecs[:,idx]
+		# sort eigenvectors according to same index
+
+		evals = evals[idx]
+		# select the first 3 eigenvectors (3 is desired dimension
+		# of rescaled data array)
+
+		evecs = evecs[:, :3]
+		# carry out the transformation on the data using eigenvectors
+		# and return the re-scaled data, eigenvalues, and eigenvectors
+		m = np.dot(evecs.T, res.T).T
+
+
+		# make a matrix with the three eigenvectors as its columns.
+		evecs_mat = np.column_stack((evecs))
+
+		# perturbing color in image[0]
+		# re-scaling from 0-1
+		img = image_array/255.0
+		#data_aug(img)
+
+		mu = 0
+		#sigma = 0.1
+		feature_vec=np.matrix(evecs_mat)
+
+		# 3 x 1 scaled eigenvalue matrix
+		se = np.zeros((3,1))
+		se[0][0] = np.random.normal(mu, sigma)*evals[0]
+		se[1][0] = np.random.normal(mu, sigma)*evals[1]
+		se[2][0] = np.random.normal(mu, sigma)*evals[2]
+		se = np.matrix(se)
+		val = feature_vec*se
+
+		# Parse through every pixel value.
+		for i in xrange(img.shape[0]):
+			for j in xrange(img.shape[1]):
+				# Parse through every dimension.
+				for k in xrange(img.shape[2]):
+					img[i,j,k] = float(img[i,j,k]) + float(val[k])
+								 
+		img = img*255
+		np.clip(img, 0, 255, out=img)
+		
+		with warnings.catch_warnings():
+			 warnings.simplefilter("ignore")
+			 return Image.fromarray(img.astype('uint8'), 'RGB')
 
 
 class Custom(Operation):

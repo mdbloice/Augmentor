@@ -770,6 +770,22 @@ class Pipeline(object):
         else:
             self.add_operation(Flip(probability=probability, top_bottom_left_right="LEFT_RIGHT"))
 
+    def fancy_pca(self, probability, sigma=0.1):
+        """
+        FancyPCA 
+		Calculate Principal components
+
+        :param probability: A value between 0 and 1 representing the
+         probability that the operation should be performed.
+        :type probability: Float
+        
+        :param sigma: A value between 0 and 1 representing the
+         standard deviation of the random number used for PCA
+        :type sigma: Float        
+        :return: None
+        """
+        self.add_operation(Fancy_PCA(probability=probability,sigma=sigma))   
+        
     def flip_random(self, probability):
         """
         Flip (mirror) the image along **either** its horizontal or vertical
