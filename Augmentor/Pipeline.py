@@ -192,7 +192,8 @@ class Pipeline(object):
                 image = operation.perform_operation(image)
 
         if save_to_disk:
-            file_name = str(uuid.uuid4()) + "." + self.save_format
+            filename, ext = os.path.splitext(os.path.basename(augmentor_image.image_path))
+            file_name = "{}_{}.{}".format(filename, str(uuid.uuid4()), self.save_format)
             try:
                 # A strange error is forcing me to do this at the moment, but will fix later properly
                 # TODO: Fix this!
