@@ -64,7 +64,7 @@ class NumpyPipeline(Pipeline):
                 labels.pop(idx)
 
         if images_count != labels_count:
-            raise Exception("Number of input images and labels does not match : %d vs %d" % (arrays, labels_count))
+            raise Exception("Number of input images and labels does not match : %d vs %d" % (images_count, labels_count))
 
         self.images = images
         self.labels = labels
