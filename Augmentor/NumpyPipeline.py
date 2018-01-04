@@ -77,7 +77,7 @@ class NumpyPipeline(Pipeline):
         This function generate samples from the NumpyPipeline, 
         using a list of image (numpy array) and a corresponding list of label which 
         were defined during instantiation. 
-        For each image with size (w, h, d) a new (w, h, d, n) numpy array is generated.
+        For each image with size (w, h, d) a new n*(w, h, d) image is generated.
 
         :param n: The number of new samples to produce.
         :type n: Integer
@@ -102,16 +102,14 @@ class NumpyPipeline(Pipeline):
             width, height, depth = np.shape(image)
             image_samples = np.zeros((width, height, depth, n), dtype=np.uint8)
             while sample_count < n:
-                image_samples[:, :, :, sample_count] = self._execute_with_array(image)
+                image_sample = self._execute_with_array(image)
                 sample_count += 1
                 progress = idx * labels_count + sample_count
                 progress_bar.set_description("Processing %d in total %d" % (progress, samples_total))
                 progress_bar.update(1)
 
-
-            image_samples_all.append(image_samples)
-            label_samples_all = self.labels[idx] * n
-
+                image_samples_all.append(image_sample)
+                label_samples_all.append(self.labels[idx])
 
         progress_bar.close()
         return image_samples_all, label_samples_all
