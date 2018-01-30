@@ -40,8 +40,8 @@ p = Augmentor.Pipeline("/path/to/images")
 You can then add operations to the Pipeline object `p` as follows:
 
 ```python
-p.rotate(probability=0.7, max_left=10, max_right=10)
-p.zoom(probability=0.5, min_scale=1.1, max_scale=1.5)
+p.rotate(probability=0.7, max_left_rotation=10, max_right_rotation=10)
+p.zoom(probability=0.5, min_factor=1.1, max_factor=1.5)
 ```
 
 Every function requires you to specify a probability, which is used to decide if an operation is applied to an image as it is passed through the augmentation pipeline.
