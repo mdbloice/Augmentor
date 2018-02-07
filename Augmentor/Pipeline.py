@@ -1350,3 +1350,26 @@ class Pipeline(object):
             raise ValueError("The rectangle_area must be between 0.1 and 1.")
         else:
             self.add_operation(RandomErasing(probability=probability, rectangle_area=rectangle_area))
+    
+    def noise(self, probability, mean=0, std=0.3):
+        """
+        The class `:class noise` is used to perfrom gaussian noise on images passed
+        to its :func:`perform_operation` function.
+
+        Its purpose is to make models robust to adversarial learning, by
+        randomly adding gassian noise to original images, which human could not
+        tell the difference between them.
+
+        :param probability: A value between 0 and 1 representing the
+         probability that the operation should be performed.
+        :param mean: The mean value of the gaussian distribution.
+        :param std: The std value of the gaussian distribution.
+        :return: None
+        """
+        if not 0 < probability <= 1:
+            raise ValueError(Pipeline._probability_error_text)
+        elif std <= 0:
+            raise ValueError('The standard deviation must larger than 0.')
+        else:
+            self.add_operation(GaussianNoise(probability=probability, mean=mean, std=std))
+

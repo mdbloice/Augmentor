@@ -1617,3 +1617,21 @@ class Custom(Operation):
          will expect an image of type PIL.Image)
         """
         return self.function_name(image, **self.function_arguments)
+
+class GaussianNoise(Operation):
+    """
+    The class `:class noise` is used to perfrom random noise on images passed
+    to its :func:`perform_operation` function.
+    """
+    def __init__(self, probability, mean, std):
+        Operation.__init__(self, probability)
+        self.mean = mean
+        self.std = std
+
+    def perform_operation(self, image):
+        w, h = image.size
+        c = len(image.getbands())
+        
+        noise = np.random.normal(self.mean, self.std, (h, w, c))
+
+        return Image.fromarray(np.uint8(np.array(image) + noise))
