@@ -208,6 +208,8 @@ p.flip_left_right(probability=0.8)
 p.flip_top_bottom(probability=0.3)
 p.crop_random(probability=1, percentage_area=0.5)
 p.resize(probability=1.0, width=120, height=120)
+p.noise(probability=1.0)
+# or p.noise(probability=1.0, mean=0, std=0.5)
 ```
 
 Once you have added the operations you require, you can sample images from this pipeline:
