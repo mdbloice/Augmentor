@@ -846,20 +846,21 @@ class Crop(Operation):
         :return: The transformed image(s) as a list of object(s) of type
          PIL.Image.
         """
-
-        def do(image):
+        
+        # The images must be of identical size, which is checked by Pipeline.ground_truth().
+        w, h = images[0].size
+        
+        diff_w, diff_h = w - self.width, h - self.height
+        
+        sign_w, sign_h = np.sign(diff_w), np.sign(diff_h)
             
-            w, h = image.size
-            diff_w, diff_h = w - self.width, h - self.height
-
+        left_shift = sign_w * random.randint(0, int(sign_w * diff_w))
+        down_shift = sign_h * random.randint(0, int(sign_h * diff_h))
+        
+        def do(image):
             if self.centre:
                 top_left_x, top_left_y = min(diff_w, w - diff_w), min(diff_h, h - diff_h)
                 return image.crop((top_left_x, top_left_y, w - top_left_x, h - top_left_y))
-            
-            sign_w, sign_h = np.sign(diff_w), np.sign(diff_h)
-            
-            left_shift = sign_w * random.randint(0, int(sign_w * diff_w))
-            down_shift = sign_h * random.randint(0, int(sign_h * diff_h))
             return image.crop((left_shift, down_shift, self.width + left_shift, self.height + down_shift))
 
         augmented_images = []
