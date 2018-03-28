@@ -41,7 +41,7 @@ p = Augmentor.Pipeline("/path/to/images")
 You can then add operations to the Pipeline object `p` as follows:
 
 ```python
-p.rotate(probability=0.7, max_left=10, max_right=10)
+p.rotate(probability=0.7, max_left_rotation=10, max_right_rotation=10)
 p.zoom(probability=0.5, min_factor=1.1, max_factor=1.5)
 ```
 
