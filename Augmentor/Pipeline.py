@@ -222,7 +222,7 @@ class Pipeline(object):
         # Currently we return only the first image if it is a list
         # for the generator functions.  This will be fixed in a future
         # version.
-        return images[0]
+        return images
 
     def _execute_with_array(self, image):
         """
@@ -319,7 +319,7 @@ class Pipeline(object):
         a = AugmentorImage(image_path=None, output_directory=None)
         a.image_PIL = Image.fromarray(image_array)
 
-        return self._execute(a, save_to_disk)
+        return self._execute(a, save_to_disk)[0]
 
     @staticmethod
     def categorical_labels(numerical_labels):
@@ -341,7 +341,7 @@ class Pipeline(object):
     def image_generator(self):
         while True:
             im_index = random.randint(0, len(self.augmentor_images)-1)  # Fix for issue 52.
-            yield self._execute(self.augmentor_images[im_index], save_to_disk=False), \
+            yield self._execute(self.augmentor_images[im_index], save_to_disk=False)[0], \
                 self.augmentor_images[im_index].class_label_int
 
     def keras_generator(self, batch_size, scaled=True, image_data_format="channels_last"):
@@ -404,8 +404,12 @@ class Pipeline(object):
 
                 # Select random image, get image array and label
                 random_image_index = random.randint(0, len(self.augmentor_images)-1)
-                numpy_array = np.asarray(self._execute(self.augmentor_images[random_image_index], save_to_disk=False))
-                label = self.augmentor_images[random_image_index].categorical_label
+                images = self._execute(self.augmentor_images[random_image_index], save_to_disk=False)
+                numpy_array = np.asarray(images[0])
+                if len(images) == 1:
+                    label = self.augmentor_images[random_image_index].categorical_label
+                else:
+                    label = np.asarray(images[1])
 
                 # Reshape
                 w = numpy_array.shape[0]
@@ -418,8 +422,12 @@ class Pipeline(object):
 
                 if image_data_format == "channels_last":
                     numpy_array = numpy_array.reshape(w, h, l)
+                    if len(images) > 1:
+                        label = label.reshape(w, h, l)
                 elif image_data_format == "channels_first":
                     numpy_array = numpy_array.reshape(l, w, h)
+                    if len(images) > 1:
+                        label = label.reshape(l, w, h)
 
                 X.append(numpy_array)
                 y.append(label)
