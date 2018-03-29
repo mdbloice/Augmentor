@@ -306,13 +306,10 @@ class Pipeline(object):
          See :func:`keras_image_generator_without_replacement()` for
 
         :param image_array: The image to pass through the pipeline.
-        :param save_to_disk: Whether to save to disk or not (default).
         :return:
         """
-        a = AugmentorImage(image_path=None, output_directory=None)
-        a.image_PIL = Image.fromarray(image_array)
 
-        return self._execute(a, save_to_disk)
+        return self._execute_with_array(image_array)
 
     @staticmethod
     def categorical_labels(numerical_labels):
