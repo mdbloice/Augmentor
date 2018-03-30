@@ -298,7 +298,7 @@ class Pipeline(object):
                 sample_count += 1
         progress_bar.close()
 
-    def sample_with_array(self, image_array, save_to_disk=False):
+    def sample_with_array(self, image_array):
         """
         Generate images using a single image in array-like format.
 
