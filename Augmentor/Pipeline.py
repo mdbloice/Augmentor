@@ -1,15 +1,4 @@
-# Pipeline.py
-# Author: Marcus D. Bloice <https://github.com/mdbloice>
-# Licensed under the terms of the MIT Licence.
-"""
-The Pipeline module is the user facing API for the Augmentor package. It
-contains the :class:`~Augmentor.Pipeline.Pipeline` class which is used to
-create pipeline objects, which can be used to build an augmentation pipeline
-by adding operations to the pipeline object.
 
-For a good overview of how to use Augmentor, along with code samples and
-example images, can be seen in the :ref:`mainfeatures` section.
-"""
 from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
 
@@ -23,11 +12,176 @@ import sys
 import random
 import uuid
 import warnings
+import numbers
 import numpy as np
-from concurrent.futures import ThreadPoolExecutor
 
 from tqdm import tqdm
 from PIL import Image
+from abc import abstractmethod
+
+class Sequence(object):
+    """Base object for fitting to a sequence of data, such as a dataset.
+
+    Every `Sequence` must implements the `__getitem__` and the `__len__` methods.
+    If you want to modify your dataset between epochs you may implement `on_epoch_end`.
+    The method `__getitem__` should return a complete batch.
+
+    # Notes
+
+    `Sequence` are a safer way to do multiprocessing. This structure guarantees that the network will only train once
+     on each sample per epoch which is not the case with generators.
+
+    # Examples
+
+    ```python
+        from skimage.io import imread
+        from skimage.transform import resize
+        import numpy as np
+
+        # Here, `x_set` is list of path to the images
+        # and `y_set` are the associated classes.
+
+        class CIFAR10Sequence(Sequence):
+
+            def __init__(self, x_set, y_set, batch_size):
+                self.x, self.y = x_set, y_set
+                self.batch_size = batch_size
+
+            def __len__(self):
+                return np.ceil(len(self.x) / float(self.batch_size))
+
+            def __getitem__(self, idx):
+                batch_x = self.x[idx * self.batch_size:(idx + 1) * self.batch_size]
+                batch_y = self.y[idx * self.batch_size:(idx + 1) * self.batch_size]
+
+                return np.array([
+                    resize(imread(file_name), (200, 200))
+                       for file_name in batch_x]), np.array(batch_y)
+    ```
+    """
+
+    @abstractmethod
+    def __getitem__(self, index):
+        """Gets batch at position `index`.
+
+        # Arguments
+            index: position of the batch in the Sequence.
+
+        # Returns
+            A batch
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def __len__(self):
+        """Number of batch in the Sequence.
+
+        # Returns
+            The number of batches in the Sequence.
+        """
+        raise NotImplementedError
+
+    def on_epoch_end(self):
+        """Method called at the end of every epoch.
+        """
+        pass
+
+    def __iter__(self):
+        """Create an infinite generator that iterate over the Sequence."""
+        while True:
+            for item in (self[i] for i in range(len(self))):
+                yield item
+
+
+class Iterator(Sequence):
+    """Base class for image data iterators.
+
+    Every `Iterator` must implement the `_get_batches_of_transformed_samples`
+    method.
+
+    # Arguments
+        n: Integer, total number of samples in the dataset to loop over.
+        batch_size: Integer, size of a batch.
+        shuffle: Boolean, whether to shuffle the data between epochs.
+        seed: Random seeding for data shuffling.
+    """
+
+    def __init__(self, n, batch_size, shuffle, seed):
+        self.n = n
+        self.batch_size = batch_size
+        self.seed = seed
+        self.shuffle = shuffle
+        self.batch_index = 0
+        self.total_batches_seen = 0
+        self.lock = threading.Lock()
+        self.index_array = None
+        self.index_generator = self._flow_index()
+
+    def _set_index_array(self):
+        self.index_array = np.arange(self.n)
+        if self.shuffle:
+            self.index_array = np.random.permutation(self.n)
+
+    def __getitem__(self, idx):
+        if idx >= len(self):
+            raise ValueError('Asked to retrieve element {idx}, '
+                             'but the Sequence '
+                             'has length {length}'.format(idx=idx,
+                                                          length=len(self)))
+        if self.seed is not None:
+            np.random.seed(self.seed + self.total_batches_seen)
+        self.total_batches_seen += 1
+        if self.index_array is None:
+            self._set_index_array()
+        index_array = self.index_array[self.batch_size * idx:
+                                       self.batch_size * (idx + 1)]
+        return self._get_batches_of_transformed_samples(index_array)
+
+    def __len__(self):
+        return (self.n + self.batch_size - 1) // self.batch_size  # round up
+
+    def on_epoch_end(self):
+        self._set_index_array()
+
+    def reset(self):
+        self.batch_index = 0
+
+    def _flow_index(self):
+        # Ensure self.batch_index is 0.
+        self.reset()
+        while 1:
+            if self.seed is not None:
+                np.random.seed(self.seed + self.total_batches_seen)
+            if self.batch_index == 0:
+                self._set_index_array()
+
+            current_index = (self.batch_index * self.batch_size) % self.n
+            if self.n > current_index + self.batch_size:
+                self.batch_index += 1
+            else:
+                self.batch_index = 0
+            self.total_batches_seen += 1
+            yield self.index_array[current_index:
+                                   current_index + self.batch_size]
+
+    def __iter__(self):
+        # Needed if we want to do something like:
+        # for x, y in data_gen.flow(...):
+        return self
+
+    def __next__(self, *args, **kwargs):
+        return self.next(*args, **kwargs)
+
+    def _get_batches_of_transformed_samples(self, index_array):
+        """Gets a batch of transformed samples.
+
+        # Arguments
+            index_array: array of sample indices to include in batch.
+
+        # Returns
+            A batch of transformed samples.
+        """
+        raise NotImplementedError
 
 
 class Pipeline(object):
@@ -47,14 +201,12 @@ class Pipeline(object):
         """
         Create a new Pipeline object pointing to a directory containing your
         original image dataset.
-
         Create a new Pipeline object, using the :attr:`source_directory`
         parameter as a source directory where your original images are
         stored. This folder will be scanned, and any valid file files
         will be collected and used as the original dataset that should
         be augmented. The scan will find any image files with the extensions
         JPEG/JPG, PNG, and GIF (case insensitive).
-
         :param source_directory: A directory on your filesystem where your
          original images are stored.
         :param output_directory: Specifies where augmented images should be
@@ -87,21 +239,6 @@ class Pipeline(object):
                            ground_truth_directory=None,
                            ground_truth_output_directory=output_directory)
 
-    def __call__(self, augmentor_image):
-        """
-        Function used by the ThreadPoolExecutor to process the pipeline
-        using multiple threads. Do not call directly.
-
-        This function does nothing except call :func:`_execute`, rather
-        than :func:`_execute` being called directly in :func:`sample`.
-        This makes it possible for the procedure to be *pickled* and
-        therefore suitable for multi-threading.
-
-        :param augmentor_image: The image to pass through the pipeline.
-        :return:
-        """
-        return self._execute(augmentor_image)
-
     def _populate(self, source_directory, output_directory, ground_truth_directory, ground_truth_output_directory):
         """
         Private method for populating member variables with AugmentorImage
@@ -109,9 +246,7 @@ class Pipeline(object):
         specified by the user. It also populates a number of fields such as
         the :attr:`output_directory` member variable, used later when saving
         images to disk.
-
         This method is used by :func:`__init__`.
-
         :param source_directory: The directory to scan for images.
         :param output_directory: The directory to set for saving files.
          Defaults to a directory named output relative to
@@ -179,15 +314,13 @@ class Pipeline(object):
         sys.stdout.write("Initialised with %s image(s) found.\n" % len(self.augmentor_images))
         sys.stdout.write("Output directory set to %s." % abs_output_directory)
 
-    def _execute(self, augmentor_image, save_to_disk=True, multi_threaded=False):
+    def _execute(self, augmentor_image, save_to_disk=True):
         """
         Private method. Used to pass an image through the current pipeline,
         and return the augmented image.
-
         The returned image can then either be saved to disk or simply passed
         back to the user. Currently this is fixed to True, as Augmentor
         has only been implemented to save to disk at present.
-
         :param augmentor_image: The image to pass through the pipeline.
         :param save_to_disk: Whether to save the image to disk. Currently
          fixed to true.
@@ -195,6 +328,7 @@ class Pipeline(object):
         :type save_to_disk: Boolean
         :return: The augmented image.
         """
+        # self.image_counter += 1  # TODO: See if I can remove this...
 
         images = []
 
@@ -233,10 +367,10 @@ class Pipeline(object):
                 print("You can change the save format using the set_save_format(save_format) function.")
                 print("By passing save_format=\"auto\", Augmentor can save in the correct format automatically.")
 
-        if multi_threaded:
-            return os.path.basename(augmentor_image.image_path)
-        else:
-            return images[0]  # Here we return only the first image for the generators.
+        # Currently we return only the first image if it is a list
+        # for the generator functions.  This will be fixed in a future
+        # version.
+        return images[0]
 
     def _execute_with_array(self, image):
         """
@@ -263,14 +397,12 @@ class Pipeline(object):
         :attr:`save_format="auto"` to allow Augmentor to choose
         the correct save format based on each individual image's
         file extension.
-
         If :attr:`save_format` is set to, for example,
         :attr:`save_format="JPEG"` or :attr:`save_format="JPG"`,
         Augmentor will attempt to save the files using the
         JPEG format, which may result in errors if the file cannot
         be saved in this format, such as trying to save PNG images
         with an alpha channel as JPEG.
-
         :param save_format: The save format to save the images
          when writing to disk.
         :return: None
@@ -281,25 +413,15 @@ class Pipeline(object):
         else:
             self.save_format = save_format
 
-    def sample(self, n, multi_threaded=True):
+    def sample(self, n):
         """
         Generate :attr:`n` number of samples from the current pipeline.
-
         This function samples from the pipeline, using the original images
         defined during instantiation. All images generated by the pipeline
         are by default stored in an ``output`` directory, relative to the
         path defined during the pipeline's instantiation.
-
-        By default, Augmentor will use multi-threading to increase the speed
-        of processing the images. However, this may slow down some
-        operations if the images are very small. Set :attr:`multi_threaded`
-        to ``False`` if slowdown is experienced.
-
         :param n: The number of new samples to produce.
         :type n: Integer
-        :param multi_threaded: Whether to use multi-threading to process the
-         images. Defaults to ``True``.
-        :type multi_threaded: Boolean
         :return: None
         """
         if len(self.augmentor_images) == 0:
@@ -310,71 +432,28 @@ class Pipeline(object):
         if len(self.operations) == 0:
             raise IndexError("There are no operations associated with this pipeline.")
 
-        ####
-        # Pre-multi-threading code. Remove.
-        #sample_count = 1
-        #progress_bar = tqdm(total=n, desc="Executing Pipeline", unit=' Samples', leave=False)
-        #while sample_count <= n:
-        #    for augmentor_image in self.augmentor_images:
-        #        if sample_count <= n:
-        #            self._execute(augmentor_image)
-        #            file_name_to_print = os.path.basename(augmentor_image.image_path)
-        #            # This is just to shorten very long file names which obscure the progress bar.
-        #            if len(file_name_to_print) >= 30:
-        #                file_name_to_print = file_name_to_print[0:10] + "..." + \
-        #                                     file_name_to_print[-10: len(file_name_to_print)]
-        #            progress_bar.set_description("Processing %s" % file_name_to_print)
-        #            progress_bar.update(1)
-        #        sample_count += 1
-        #progress_bar.close()
+        sample_count = 1
 
-        if n == 0:
-            augmentor_images = self.augmentor_images
-        else:
-            augmentor_images = [random.choice(self.augmentor_images) for _ in range(n)]
-
-        if multi_threaded:
-            # TODO: Restore the functionality from the pre-multi-thread code above.
-            with tqdm(total=len(augmentor_images), desc="Executing Pipeline", unit=" Samples") as progress_bar:
-                with ThreadPoolExecutor(max_workers=None) as executor:
-                    for result in executor.map(self, augmentor_images):
-                        progress_bar.set_description("Processing %s" % result)
-                        progress_bar.update(1)
-        else:
-            with tqdm(total=len(augmentor_images), desc="Executing Pipeline", unit=" Samples") as progress_bar:
-                for augmentor_image in augmentor_images:
+        progress_bar = tqdm(total=n, desc="Executing Pipeline", unit=' Samples', leave=False)
+        while sample_count <= n:
+            for augmentor_image in self.augmentor_images:
+                if sample_count <= n:
                     self._execute(augmentor_image)
-                    progress_bar.set_description("Processing %s" % os.path.basename(augmentor_image.image_path))
+                    file_name_to_print = os.path.basename(augmentor_image.image_path)
+                    # This is just to shorten very long file names which obscure the progress bar.
+                    if len(file_name_to_print) >= 30:
+                        file_name_to_print = file_name_to_print[0:10] + "..." + \
+                                             file_name_to_print[-10: len(file_name_to_print)]
+                    progress_bar.set_description("Processing %s" % file_name_to_print)
                     progress_bar.update(1)
-
-        # This does not work as it did in the pre-multi-threading code above for some reason.
-        # progress_bar.close()
-
-    def process(self):
-        """
-        This function is used to process every image in the pipeline
-        exactly once.
-
-        This might be useful for resizing a dataset for example, and
-        uses multi-threading for fast execution.
-
-        It would make sense to set the probability of every operation
-        in the pipeline to ``1`` when using this function.
-
-        :return: None
-        """
-
-        self.sample(0, multi_threaded=True)
-
-        return None
+                sample_count += 1
+        progress_bar.close()
 
     def sample_with_array(self, image_array, save_to_disk=False):
         """
         Generate images using a single image in array-like format.
-
         .. seealso::
          See :func:`keras_image_generator_without_replacement()` for
-
         :param image_array: The image to pass through the pipeline.
         :param save_to_disk: Whether to save to disk or not (default).
         :return:
@@ -388,7 +467,6 @@ class Pipeline(object):
     def categorical_labels(numerical_labels):
         """
         Return categorical labels for an array of 0-based numerical labels.
-
         :param numerical_labels: The numerical labels.
         :type numerical_labels: Array-like list.
         :return: The categorical labels.
@@ -407,32 +485,26 @@ class Pipeline(object):
             yield self._execute(self.augmentor_images[im_index], save_to_disk=False), \
                 self.augmentor_images[im_index].class_label_int
 
-    def keras_generator(self, batch_size, scaled=True, image_data_format="channels_last"):
+    def keras_generator(self, batch_size, scaled=True, image_data_format="channels_last", with_indexes=False):
         """
         Returns an image generator that will sample from the current pipeline
         indefinitely, as long as it is called.
-
         .. warning::
          This function returns images from the current pipeline
          **with replacement**.
-
         You must configure the generator to provide data in the same
         format that Keras is configured for. You can use the functions
         :func:`keras.backend.image_data_format()` and
         :func:`keras.backend.set_image_data_format()` to get and set
         Keras' image format at runtime.
-
         .. code-block:: python
-
             >>> from keras import backend as K
             >>> K.image_data_format()
             'channels_first'
             >>> K.set_image_data_format('channels_last')
             >>> K.image_data_format()
             'channels_last'
-
         By default, Augmentor uses ``'channels_last'``.
-
         :param batch_size: The number of images to return per batch.
         :type batch_size: Integer
         :param scaled: True (default) if pixels are to be converted
@@ -448,6 +520,9 @@ class Pipeline(object):
         if image_data_format not in ["channels_first", "channels_last"]:
             warnings.warn("To work with Keras, must be one of channels_first or channels_last.")
 
+        iter = Iterator (len (self.augmentor_images), batch_size, True, 42)
+        self.indexes_gen = self.iter._flow_index ()
+
         while True:
 
             # Randomly select 25 images for augmentation and yield the
@@ -459,14 +534,15 @@ class Pipeline(object):
 
             X = []
             y = []
-
-            for i in range(batch_size):
-
+            Z = []
+            for batch_indexes in self.indexes_gen:
+                break
+            for random_image_index in batch_indexes:
                 # Pre-allocate
                 # batch[i:i+28]
 
                 # Select random image, get image array and label
-                random_image_index = random.randint(0, len(self.augmentor_images)-1)
+                Z.append(random_image_index)
                 numpy_array = np.asarray(self._execute(self.augmentor_images[random_image_index], save_to_disk=False))
                 label = self.augmentor_images[random_image_index].categorical_label
 
@@ -493,35 +569,33 @@ class Pipeline(object):
             if scaled:
                 X = X.astype('float32')
                 X /= 255
+            if with_indexes:
+                yield (X, y, Z)
+            else:
+                yield (X, y)
 
-            yield (X, y)
+
 
     def keras_generator_from_array(self, images, labels, batch_size, scaled=True, image_data_format="channels_last"):
         """
         Returns an image generator that will sample from the current pipeline
         indefinitely, as long as it is called.
-
         .. warning::
          This function returns images from :attr:`images`
          **with replacement**.
-
         You must configure the generator to provide data in the same
         format that Keras is configured for. You can use the functions
         :func:`keras.backend.image_data_format()` and
         :func:`keras.backend.set_image_data_format()` to get and set
         Keras' image format at runtime.
-
         .. code-block:: python
-
             >>> from keras import backend as K
             >>> K.image_data_format()
             'channels_first'
             >>> K.set_image_data_format('channels_last')
             >>> K.image_data_format()
             'channels_last'
-
         By default, Augmentor uses ``'channels_last'``.
-
         :param images: The images to augment using the current pipeline.
         :type images: Array-like matrix. For greyscale images they can be
          in the form ``(l, x, y)`` or ``(l, x, y, 1)``, where
@@ -604,9 +678,7 @@ class Pipeline(object):
     def torch_transform(self):
         """
         Returns the pipeline as a function that can be used with torchvision.
-
         .. code-block:: python
-
             >>> import Augmentor
             >>> import torchvision
             >>> p = Augmentor.Pipeline()
@@ -616,7 +688,6 @@ class Pipeline(object):
             >>>     p.torch_transform(),
             >>>     torchvision.transforms.ToTensor(),
             >>> ])
-
         :return: The pipeline as a function.
         """
         def _transform(image):
@@ -634,13 +705,10 @@ class Pipeline(object):
         """
         Add an operation directly to the pipeline. Can be used to add custom
         operations to a pipeline.
-
         To add custom operations to a pipeline, subclass from the
         Operation abstract base class, overload its methods, and insert the
         new object into the pipeline using this method.
-
          .. seealso:: The :class:`.Operation` class.
-
         :param operation: An object of the operation you wish to add to the
          pipeline. Will accept custom operations written at run-time.
         :type operation: Operation
@@ -656,10 +724,8 @@ class Pipeline(object):
         Remove the operation specified by :attr:`operation_index`, if
         supplied, otherwise it will remove the latest operation added to the
         pipeline.
-
          .. seealso:: Use the :func:`status` function to find an operation's
           index.
-
         :param operation_index: The index of the operation to remove.
         :type operation_index: Integer
         :return: The removed operation. You can reinsert this at end of the
@@ -672,7 +738,6 @@ class Pipeline(object):
     def add_further_directory(self, new_source_directory, new_output_directory="output"):
         """
         Add a further directory containing images you wish to scan for augmentation.
-
         :param new_source_directory: The directory to scan for images.
         :param new_output_directory: The directory to use for outputted,
          augmented images.
@@ -693,16 +758,12 @@ class Pipeline(object):
         Prints the status of the pipeline to the console. If you want to
         remove an operation, use the index shown and the
         :func:`remove_operation` method.
-
          .. seealso:: The :func:`remove_operation` function.
-
          .. seealso:: The :func:`add_operation` function.
-
         The status includes the number of operations currently attached to
         the pipeline, each operation's parameters, the number of images in the
         pipeline, and a summary of the images' properties, such as their
         dimensions and formats.
-
         :return: None
         """
         # TODO: Return this as a dictionary of some kind and print from the dict if in console
@@ -740,7 +801,6 @@ class Pipeline(object):
     def set_seed(seed):
         """
         Set the seed of Python's internal random number generator.
-
         :param seed: The seed to use. Strings or other objects will be hashed.
         :type seed: Integer
         :return: None
@@ -756,11 +816,9 @@ class Pipeline(object):
     def rotate90(self, probability):
         """
         Rotate an image by 90 degrees.
-
         The operation will rotate an image by 90 degrees, and will be
         performed with a probability of that specified by the
         :attr:`probability` parameter.
-
         :param probability: A value between 0 and 1 representing the
          probability that the operation should be performed.
         :type probability: Float
@@ -774,11 +832,9 @@ class Pipeline(object):
     def rotate180(self, probability):
         """
         Rotate an image by 180 degrees.
-
         The operation will rotate an image by 180 degrees, and will be
         performed with a probability of that specified by the
         :attr:`probability` parameter.
-
         :param probability: A value between 0 and 1 representing the
          probability that the operation should be performed.
         :type probability: Float
@@ -792,11 +848,9 @@ class Pipeline(object):
     def rotate270(self, probability):
         """
         Rotate an image by 270 degrees.
-
         The operation will rotate an image by 270 degrees, and will be
         performed with a probability of that specified by the
         :attr:`probability` parameter.
-
         :param probability: A value between 0 and 1 representing the
          probability that the operation should be performed.
         :type probability: Float
@@ -810,7 +864,6 @@ class Pipeline(object):
     def rotate_random_90(self, probability):
         """
         Rotate an image by either 90, 180, or 270 degrees, selected randomly.
-
         This function will rotate by either 90, 180, or 270 degrees. This is
         useful to avoid scenarios where images may be rotated back to their
         original positions (such as a :func:`rotate90` and a :func:`rotate270`
@@ -818,7 +871,6 @@ class Pipeline(object):
         uniformly from 90, 180, or 270 degrees. The probability controls the
         chance of the operation being performed at all, and does not affect
         the rotation degree.
-
         :param probability: A value between 0 and 1 representing the
          probability that the operation should be performed.
         :type probability: Float
@@ -832,25 +884,20 @@ class Pipeline(object):
     def rotate(self, probability, max_left_rotation, max_right_rotation):
         """
         Rotate an image by an arbitrary amount.
-
         The operation will rotate an image by an random amount, within a range
         specified. The parameters :attr:`max_left_rotation` and
         :attr:`max_right_rotation` allow you to control this range. If you
         wish to rotate the images by an exact number of degrees, set both
         :attr:`max_left_rotation` and :attr:`max_right_rotation` to the same
         value.
-
         .. note:: This function will rotate **in place**, and crop the largest
          possible rectangle from the rotated image.
-
         In practice, angles larger than 25 degrees result in images that
         do not render correctly, therefore there is a limit of 25 degrees
         for this function.
-
         If this function returns images that are not rendered correctly, then
         you must reduce the :attr:`max_left_rotation` and
         :attr:`max_right_rotation` arguments!
-
         :param probability: A value between 0 and 1 representing the
          probability that the operation should be performed.
         :param max_left_rotation: The maximum number of degrees the image can
@@ -875,12 +922,10 @@ class Pipeline(object):
     def rotate_without_crop(self, probability, max_left_rotation, max_right_rotation, expand=False):
         """
         Rotate an image without automatically cropping.
-
         The :attr:`expand` parameter controls whether the image is enlarged
         to contain the new rotated images, or if the image size is maintained
         Defaults to :attr:`false` so that images maintain their dimensions
         when using this function.
-
         :param probability: A value between 0 and 1 representing the
          probability that the operation should be performed.
         :param max_left_rotation: The maximum number of degrees the image can
@@ -902,9 +947,7 @@ class Pipeline(object):
         """
         Flip (mirror) the image along its vertical axis, i.e. from top to
         bottom.
-
         .. seealso:: The :func:`flip_left_right` function.
-
         :param probability: A value between 0 and 1 representing the
          probability that the operation should be performed.
         :type probability: Float
@@ -919,9 +962,7 @@ class Pipeline(object):
         """
         Flip (mirror) the image along its horizontal axis, i.e. from left to
         right.
-
         .. seealso:: The :func:`flip_top_bottom` function.
-
         :param probability: A value between 0 and 1 representing the
          probability that the operation should be performed.
         :type probability: Float
@@ -936,10 +977,8 @@ class Pipeline(object):
         """
         Flip (mirror) the image along **either** its horizontal or vertical
         axis.
-
         This function mirrors the image along either the horizontal axis or
         the vertical access. The axis is selected randomly.
-
         :param probability: A value between 0 and 1 representing the
          probability that the operation should be performed.
         :type probability: Float
@@ -953,19 +992,16 @@ class Pipeline(object):
     def random_distortion(self, probability, grid_width, grid_height, magnitude):
         """
         Performs a random, elastic distortion on an image.
-
         This function performs a randomised, elastic distortion controlled
         by the parameters specified. The grid width and height controls how
         fine the distortions are. Smaller sizes will result in larger, more
         pronounced, and less granular distortions. Larger numbers will result
         in finer, more granular distortions. The magnitude of the distortions
         can be controlled using magnitude. This can be random or fixed.
-
         *Good* values for parameters are between 2 and 10 for the grid
         width and height, with a magnitude of between 1 and 10. Using values
         outside of these approximate ranges may result in unpredictable
         behaviour.
-
         :param probability: A value between 0 and 1 representing the
          probability that the operation should be performed.
         :param grid_width: The number of rectangles in the grid's horizontal
@@ -989,19 +1025,16 @@ class Pipeline(object):
                             sdx=0.05, sdy=0.05):
         """
         Performs a random, elastic gaussian distortion on an image.
-
         This function performs a randomised, elastic gaussian distortion controlled
         by the parameters specified. The grid width and height controls how
         fine the distortions are. Smaller sizes will result in larger, more
         pronounced, and less granular distortions. Larger numbers will result
         in finer, more granular distortions. The magnitude of the distortions
         can be controlled using magnitude. This can be random or fixed.
-
         *Good* values for parameters are between 2 and 10 for the grid
         width and height, with a magnitude of between 1 and 10. Using values
         outside of these approximate ranges may result in unpredictable
         behaviour.
-
         :param probability: A value between 0 and 1 representing the
          probability that the operation should be performed.
         :param grid_width: The number of rectangles in the grid's horizontal
@@ -1033,12 +1066,9 @@ class Pipeline(object):
         :type sdx: Float
         :type sdy: Float
         :return: None
-
         For values :attr:`mex`, :attr:`mey`, :attr:`sdx`, and :attr:`sdy` the
         surface is based on the normal distribution:
-
         .. math::
-
          e^{- \Big( \\frac{(x-\\text{mex})^2}{\\text{sdx}} + \\frac{(y-\\text{mey})^2}{\\text{sdy}} \Big) }
         """
         if not 0 < probability <= 1:
@@ -1055,15 +1085,11 @@ class Pipeline(object):
         Zoom in to an image, while **maintaining its size**. The amount by
         which the image is zoomed is a randomly chosen value between
         :attr:`min_factor` and :attr:`max_factor`.
-
         Typical values may be ``min_factor=1.1`` and ``max_factor=1.5``.
-
         To zoom by a constant amount, set :attr:`min_factor` and
         :attr:`max_factor` to the same value.
-
         .. seealso:: See :func:`zoom_random` for zooming into random areas
          of the image.
-
         :param probability: A value between 0 and 1 representing the
          probability that the operation should be performed.
         :param min_factor: The minimum factor by which to zoom the image.
@@ -1083,12 +1109,9 @@ class Pipeline(object):
     def zoom_random(self, probability, percentage_area, randomise_percentage_area=False):
         """
         Zooms into an image at a random location within the image.
-
         You can randomise the zoom level by setting the
         :attr:`randomise_percentage_area` argument to true.
-
         .. seealso:: See :func:`zoom` for zooming into the centre of images.
-
         :param probability: The probability that the function will execute
          when the image is passed through the pipeline.
         :param percentage_area: The area, as a percentage of the current
@@ -1110,17 +1133,13 @@ class Pipeline(object):
     def crop_by_size(self, probability, width, height, centre=True):
         """
         Crop an image according to a set of dimensions.
-
         Crop each image according to :attr:`width` and :attr:`height`, by
         default at the centre of each image, otherwise at a random location
         within the image.
-
         .. seealso:: See :func:`crop_random` to crop a random, non-centred
          area of the image.
-
         If the crop area exceeds the size of the image, this function will
         crop the entire area of the image.
-
         :param probability: The probability that the function will execute
          when the image is passed through the pipeline.
         :param width: The width of the desired crop.
@@ -1148,7 +1167,6 @@ class Pipeline(object):
     def crop_centre(self, probability, percentage_area, randomise_percentage_area=False):
         """
         Crops the centre of an image as a percentage of the image's area.
-
         :param probability: The probability that the function will execute
          when the image is passed through the pipeline.
         :param percentage_area: The area, as a percentage of the current
@@ -1175,10 +1193,8 @@ class Pipeline(object):
         """
         Crop a random area of an image, based on the percentage area to be
         returned.
-
         This function crops a random area from an image, based on the area you
         specify using :attr:`percentage_area`.
-
         :param probability: The probability that the function will execute
          when the image is passed through the pipeline.
         :param percentage_area: The area, as a percentage of the current
@@ -1204,7 +1220,6 @@ class Pipeline(object):
     def histogram_equalisation(self, probability=1.0):
         """
         Apply histogram equalisation to the image.
-
         :param probability: A value between 0 and 1 representing the
          probability that the operation should be performed. For histogram,
          equalisation it is recommended that the probability be set to 1.
@@ -1220,9 +1235,7 @@ class Pipeline(object):
         """
         Scale (enlarge) an image, while maintaining its aspect ratio. This
         returns an image with larger dimensions than the original image.
-
         Use :func:`resize` to resize an image to absolute pixel values.
-
         :param probability: A value between 0 and 1 representing the
          probability that the operation should be performed.
         :param scale_factor: The factor to scale by, which must be greater
@@ -1242,7 +1255,6 @@ class Pipeline(object):
         """
         Resize an image according to a set of dimensions specified by the
         user in pixels.
-
         :param probability: A value between 0 and 1 representing the
          probability that the operation should be performed. For resizing,
          it is recommended that the probability be set to 1.
@@ -1273,9 +1285,7 @@ class Pipeline(object):
         magnitude of this skew can be set to a maximum using the
         magnitude parameter. This can be either a scalar representing the
         maximum tilt, or vector representing a range.
-
         To see examples of the various skews, see :ref:`perspectiveskewing`.
-
         :param probability: A value between 0 and 1 representing the
          probability that the operation should be performed.
         :param magnitude: The maximum tilt, which must be value between 0.1
@@ -1297,9 +1307,7 @@ class Pipeline(object):
         The magnitude of this skew can be set to a maximum using the
         magnitude parameter. This can be either a scalar representing the
         maximum tilt, or vector representing a range.
-
         To see examples of the various skews, see :ref:`perspectiveskewing`.
-
         :param probability: A value between 0 and 1 representing the
          probability that the operation should be performed.
         :param magnitude: The maximum tilt, which must be value between 0.1
@@ -1324,9 +1332,7 @@ class Pipeline(object):
         this skew can be set to a maximum using the magnitude parameter.
         This can be either a scalar representing the maximum tilt, or
         vector representing a range.
-
         To see examples of the various skews, see :ref:`perspectiveskewing`.
-
         :param probability: A value between 0 and 1 representing the
          probability that the operation should be performed.
         :param magnitude: The maximum tilt, which must be value between 0.1
@@ -1347,9 +1353,7 @@ class Pipeline(object):
     def skew_corner(self, probability, magnitude=1):
         """
         Skew an image towards one corner, randomly by a random magnitude.
-
         To see examples of the various skews, see :ref:`perspectiveskewing`.
-
         :param probability: A value between 0 and 1 representing the
          probability that the operation should be performed.
         :param magnitude: The maximum skew, which must be value between 0.1
@@ -1369,9 +1373,7 @@ class Pipeline(object):
         """
         Skew an image in a random direction, either left to right,
         top to bottom, or one of 8 corner directions.
-
         To see examples of all the skew types, see :ref:`perspectiveskewing`.
-
         :param probability: A value between 0 and 1 representing the
          probability that the operation should be performed.
         :param magnitude: The maximum skew, which must be value between 0.1
@@ -1392,12 +1394,10 @@ class Pipeline(object):
     def shear(self, probability, max_shear_left, max_shear_right):
         """
         Shear the image by a specified number of degrees.
-
         In practice, shear angles of more than 25 degrees can cause
         unpredictable behaviour. If you are observing images that are
         incorrectly rendered (e.g. they do not contain any information)
         then reduce the shear angles.
-
         :param probability: The probability that the operation is performed.
         :param max_shear_left: The max number of degrees to shear to the left.
          Cannot be larger than 25 degrees.
@@ -1420,9 +1420,7 @@ class Pipeline(object):
         """
         Convert images to greyscale. For this operation, setting the
         :attr:`probability` to 1.0 is recommended.
-
         .. seealso:: The :func:`black_and_white` function.
-
         :param probability: A value between 0 and 1 representing the
          probability that the operation should be performed. For resizing,
          it is recommended that the probability be set to 1.
@@ -1439,9 +1437,7 @@ class Pipeline(object):
         Convert images to black and white. In other words convert the image
         to use a 1-bit, binary palette. The threshold defaults to 128,
         but can be controlled using the :attr:`threshold` parameter.
-
         .. seealso:: The :func:`greyscale` function.
-
         :param probability: A value between 0 and 1 representing the
          probability that the operation should be performed. For resizing,
          it is recommended that the probability be set to 1.
@@ -1464,10 +1460,8 @@ class Pipeline(object):
         """
         Invert an image. For this operation, setting the
         :attr:`probability` to 1.0 is recommended.
-
         .. warning:: This function will cause errors if used on binary, 1-bit
          palette images (e.g. black and white).
-
         :param probability: A value between 0 and 1 representing the
          probability that the operation should be performed. For resizing,
          it is recommended that the probability be set to 1.
@@ -1484,19 +1478,15 @@ class Pipeline(object):
         as described in
         `https://arxiv.org/abs/1708.04896 <https://arxiv.org/abs/1708.04896>`_
         by Zhong et al.
-
         Its purpose is to make models robust to occlusion, by randomly
         replacing rectangular regions with random pixel values.
-
         For greyscale images the random pixels values will also be greyscale,
         and for RGB images the random pixels values will be in RGB.
-
         This operation is subject to change, the original work describes
         several ways of filling the random regions, including a random
         solid colour or greyscale value. Currently this operations uses
         the method which yielded the best results in the tests performed
         by Zhong et al.
-
         :param probability: A value between 0 and 1 representing the
          probability that the operation should be performed.
         :param rectangle_area: The percentage area of the image to occlude
@@ -1515,27 +1505,22 @@ class Pipeline(object):
         Specifies a directory containing corresponding images that
         constitute respective ground truth images for the images
         in the current pipeline.
-
         This function will search the directory specified by
         :attr:`ground_truth_directory` and will associate each ground truth
         image with the images in the pipeline by file name.
-
         Therefore, an image titled ``cat321.jpg`` will match with the
         image ``cat321.jpg`` in the :attr:`ground_truth_directory`.
         The function respects each image's label, therefore the image
         named ``cat321.jpg`` with the label ``cat`` will match the image
         ``cat321.jpg`` in the subdirectory ``cat`` relative to
         :attr:`ground_truth_directory`.
-
         Typically used to specify a set of ground truth or gold standard
         images that should be augmented alongside the original images
         of a dataset, such as image masks or semantic segmentation ground
         truth images.
-
         A number of such data sets are openly available, see for example
         `https://arxiv.org/pdf/1704.06857.pdf <https://arxiv.org/pdf/1704.06857.pdf>`_
         (Garcia-Garcia et al., 2017).
-
         :param ground_truth_directory: A directory containing the
          ground truth images that correspond to the images in the
          current pipeline.
@@ -1585,7 +1570,6 @@ class Pipeline(object):
         Returns a list of image and ground truth image path pairs. Used for
         verification purposes to ensure the ground truth images match to the
         images containing in the pipeline.
-
         :return: A list of tuples containing the image path and ground truth
          path pairs.
         """
@@ -1597,17 +1581,14 @@ class Pipeline(object):
 
         return paths
 
-
 class DataFramePipeline(Pipeline):
     def __init__(self, source_dataframe, image_col, category_col, output_directory="output", save_format=None):
         """
         Create a new Pipeline object pointing to dataframe containing the paths
         to your original image dataset.
-
         Create a new Pipeline object, using the :attr:`source_dataframe`
         and the columns :attr:`image_col` for the path of the image and
         :attr:`category_col` for the name of the cateogry
-
         :param source_dataframe: A Pandas DataFrame where the images are located
         :param output_directory: Specifies where augmented images should be
          saved to the disk. Default is the absolute path
@@ -1616,7 +1597,7 @@ class DataFramePipeline(Pipeline):
          GIF.
         :return: A :class:`Pipeline` object.
         """
-        super(DataFramePipeline, self).__init__(source_directory=None,
+        super(DataFramePipeline, self).__init__(source_directory = None,
                                                 output_directory=output_directory,
                                                 save_format=save_format)
         self._populate(source_dataframe,
@@ -1639,3 +1620,5 @@ class DataFramePipeline(Pipeline):
                                                                   output_directory)
 
         self._check_images(output_directory)
+
+
