@@ -18,6 +18,7 @@ import numpy as np
 from tqdm import tqdm
 from PIL import Image
 from abc import abstractmethod
+import threading
 
 class Sequence(object):
     """Base object for fitting to a sequence of data, such as a dataset.
@@ -520,7 +521,7 @@ class Pipeline(object):
         if image_data_format not in ["channels_first", "channels_last"]:
             warnings.warn("To work with Keras, must be one of channels_first or channels_last.")
 
-        iter = Iterator (len (self.augmentor_images), batch_size, True, 42)
+        self.iter = Iterator (len (self.augmentor_images), batch_size, True, 42)
         self.indexes_gen = self.iter._flow_index ()
 
         while True:
@@ -1620,5 +1621,6 @@ class DataFramePipeline(Pipeline):
                                                                   output_directory)
 
         self._check_images(output_directory)
+
 
 
