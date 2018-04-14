@@ -536,14 +536,13 @@ class Pipeline(object):
             X = []
             y = []
             Z = []
-            for batch_indexes in self.indexes_gen:
-                break
-            for random_image_index in batch_indexes:
+            for random_image_index in next(self.indexes_gen):
                 # Pre-allocate
                 # batch[i:i+28]
 
                 # Select random image, get image array and label
-                Z.append(random_image_index)
+                if with_indexes:
+                    Z.append(random_image_index)
                 numpy_array = np.asarray(self._execute(self.augmentor_images[random_image_index], save_to_disk=False))
                 label = self.augmentor_images[random_image_index].categorical_label
 
