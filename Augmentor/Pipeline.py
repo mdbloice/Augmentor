@@ -631,6 +631,8 @@ class Pipeline(object):
                 if r <= operation.probability:
                     image = [image]
                     image = operation.perform_operation(image)
+					if type(image) is list:
+						image = image[0]
 
             return image
 
