@@ -100,7 +100,7 @@ class Pipeline(object):
         :param augmentor_image: The image to pass through the pipeline.
         :return:
         """
-        return self._execute(augmentor_image)
+        return self._execute(augmentor_image)[0]
 
     def _populate(self, source_directory, output_directory, ground_truth_directory, ground_truth_output_directory):
         """
@@ -239,9 +239,9 @@ class Pipeline(object):
         # if multi_threaded:
         #   return os.path.basename(augmentor_image.image_path)
         # else:
-        #   return images[0]  # Here we return only the first image for the generators.
+        #   return images  # Here we return all the images for the generators.
 
-        return images[0]
+        return images
 
     def _execute_with_array(self, image):
         """
@@ -322,7 +322,7 @@ class Pipeline(object):
         #while sample_count <= n:
         #    for augmentor_image in self.augmentor_images:
         #        if sample_count <= n:
-        #            self._execute(augmentor_image)
+        #            self._execute(augmentor_image)[0]
         #            file_name_to_print = os.path.basename(augmentor_image.image_path)
         #            # This is just to shorten very long file names which obscure the progress bar.
         #            if len(file_name_to_print) >= 30:
@@ -387,7 +387,7 @@ class Pipeline(object):
         a = AugmentorImage(image_path=None, output_directory=None)
         a.image_PIL = Image.fromarray(image_array)
 
-        return self._execute(a, save_to_disk)
+        return self._execute(a, save_to_disk)[0]
 
     @staticmethod
     def categorical_labels(numerical_labels):
@@ -409,7 +409,11 @@ class Pipeline(object):
     def image_generator(self):
         while True:
             im_index = random.randint(0, len(self.augmentor_images)-1)  # Fix for issue 52.
-            yield self._execute(self.augmentor_images[im_index], save_to_disk=False), \
+            if self.process_ground_truth_images:
+                images = self._execute(self.augmentor_images[im_index], save_to_disk=False)
+                yield images[0], images[1:]
+            else:
+                yield self._execute(self.augmentor_images[im_index], save_to_disk=False)[0], \
                 self.augmentor_images[im_index].class_label_int
 
     # TODO: Fix: scaled=True results in an error.
@@ -455,31 +459,62 @@ class Pipeline(object):
             warnings.warn("To work with Keras, must be one of channels_first or channels_last.")
 
         while True:
-
             # Randomly select 25 images for augmentation and yield the
             # augmented images.
-            # X = np.array([])
-            # y = np.array([])
-            # The correct thing to do here is to pre-allocate
-            # batch = np.ndarray((batch_size, 28, 28, 1))
 
-            X = []
-            y = []
+            # We take a sample image to know its size and
+            # preallocate the batch
+            sample = self.augmentor_images[0]
+            sample_image = self._execute(sample, save_to_disk=False)
+            sample_array = np.asarray(sample_image[0])
+            if self.process_ground_truth_images:
+                sample_label = np.asarray(sample_image[1])
+            else:
+                sample_label = sample.categorical_label
+
+            if np.ndim(sample_array) == 2:
+                w, h, l = sample_array.shape + (1,)
+            else:
+                w, h, l = sample_array.shape
+
+            # Preallocation of batches of X
+            X = None
+            if image_data_format == "channels_last":
+                X = np.empty((batch_size, w, h, l))
+            elif image_data_format == "channels_first":
+                X = np.empty((batch_size, l, w, h))
+            
+            # Preallocation of batches of y
+            y = None
+            if self.process_ground_truth_images:
+                if np.ndim(sample_array) == 2:
+                    w, h, l = sample_label.shape + (1,)
+                else:
+                    w, h, l = sample_label.shape
+                
+                if image_data_format == "channels_last":
+                    y = np.empty((batch_size, w, h, l))
+                elif image_data_format == "channels_first":
+                    y = np.empty((batch_size, l, w, h))
+            else:
+                y = np.empty((batch_size,) + sample_label.shape)
 
             for i in range(batch_size):
-
-                # Pre-allocate
-                # batch[i:i+28]
-
                 # Select random image, get image array and label
                 random_image_index = random.randint(0, len(self.augmentor_images)-1)
-                numpy_array = np.asarray(self._execute(self.augmentor_images[random_image_index], save_to_disk=False))
+                images = self._execute(self.augmentor_images[random_image_index], save_to_disk=False)
+
+                numpy_array = np.asarray(images[0])
+                if self.process_ground_truth_images:
+                    label = np.asarray(images[1])
+                else:
                 label = self.augmentor_images[random_image_index].categorical_label
 
-                # Reshape
+                # Reshaping of images
                 w = numpy_array.shape[0]
                 h = numpy_array.shape[1]
 
+                # transforming 2d images in 3d tensor
                 if np.ndim(numpy_array) == 2:
                     l = 1
                 else:
@@ -490,15 +525,33 @@ class Pipeline(object):
                 elif image_data_format == "channels_first":
                     numpy_array = numpy_array.reshape(l, w, h)
 
-                X.append(numpy_array)
-                y.append(label)
+                # Reshaping of masks if ground truth is given
+                if self.process_ground_truth_images:
+                    # Reshaping of images
+                    w = label.shape[0]
+                    h = label.shape[1]
 
-            X = np.asarray(X)
-            y = np.asarray(y)
+                    # transforming 2d images in 3d tensor
+                    if np.ndim(label) == 2:
+                        l = 1
+                    else:
+                        l = np.shape(numpy_array)[2]
+
+                    if image_data_format == "channels_last":
+                        label = label.reshape(w, h, l)
+                    elif image_data_format == "channels_first":
+                        label = label.reshape(l, w, h)
+
+                # The X and y are populated at the given index
+                X[i] = numpy_array
+                y[i] = label
 
             if scaled:
                 X = X.astype('float32')
-                X /= 255
+                X /= 255.
+                if self.process_ground_truth_images:
+                    y = y.astype('float32')
+                    y /= 255.
 
             yield (X, y)
 
