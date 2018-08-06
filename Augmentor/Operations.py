@@ -1814,7 +1814,6 @@ class HSVShifting(Operation):
 
     """
     Implementing HSV shifting augmentation to augmentor.
-    Work in Progress.
     """
     def __init__(self, probability, hue_shift, saturation_scale, saturation_shift, value_scale, value_shift):
         Operation.__init__(self, probability)
