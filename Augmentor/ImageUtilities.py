@@ -27,7 +27,7 @@ class AugmentorImage(object):
     Each image that is found by Augmentor during the initialisation of a
     Pipeline object is contained with a new AugmentorImage object.
     """
-    def __init__(self, image_path, output_directory):
+    def __init__(self, image_path, output_directory,ground_truth_output_directory):
         """
         To initialise an AugmentorImage object for any image, the image's
         file path is required, as well as that image's output directory,
@@ -53,6 +53,7 @@ class AugmentorImage(object):
         # Now we call the setters that we require.
         self.image_path = image_path
         self.output_directory = output_directory
+        self.ground_truth_output_directory = ground_truth_output_directory
 
     def __str__(self):
         return """
@@ -199,9 +200,11 @@ def extract_paths_and_extensions(image_path):
     return file_name, extension, root_path
 
 
-def scan(source_directory, output_directory):
+def scan(source_directory, output_directory,ground_truth_output_directory):
 
     abs_output_directory = os.path.abspath(output_directory)
+    abs_ground_truth_output_directory = os.path.join(ground_truth_output_directory)
+
     files_and_directories = glob.glob(os.path.join(os.path.abspath(source_directory), '*'))
 
     directory_count = 0
@@ -226,7 +229,7 @@ def scan(source_directory, output_directory):
         parent_directory_name = os.path.basename(os.path.abspath(source_directory))
 
         for image_path in scan_directory(source_directory):
-            a = AugmentorImage(image_path=image_path, output_directory=abs_output_directory)
+            a = AugmentorImage(image_path=image_path, output_directory=abs_output_directory,ground_truth_output_directory = abs_ground_truth_output_directory)
             a.class_label = parent_directory_name
             a.class_label_int = label_counter
             a.categorical_label = [label_counter]
