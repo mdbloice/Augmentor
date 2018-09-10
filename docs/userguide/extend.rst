@@ -57,7 +57,7 @@ If you wish to make these changes permanent, place your code in the :mod:`~Augme
 Step 2: Add an Object to the Pipeline Manually
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Once you have a new operation which is of type :class:`.Operation`, you can add an object of you new operation to an existing pipeline.
+Once you have a new operation which is of type :class:`.Operation`, you can add an object of your new operation to an existing pipeline.
 
 .. code-block:: python
 
