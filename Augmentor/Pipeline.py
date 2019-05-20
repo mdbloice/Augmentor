@@ -47,7 +47,7 @@ class Pipeline(object):
     _probability_error_text = "The probability argument must be between 0 and 1."
     _threshold_error_text = "The value of threshold must be between 0 and 255."
     _valid_formats = ["PNG", "BMP", "GIF", "JPEG"]
-    _legal_filters = ["NEAREST", "BICUBIC", "ANTIALIAS", "BILINEAR"]
+    _legal_filters = ["NEAREST", "BICUBIC", "ANTIALIAS", "BILINEAR", "LANCZOS", "BOX", "HAMMING"]
 
     def __init__(self, source_directory=None, output_directory="output", save_format=None):
         """
@@ -1339,7 +1339,7 @@ class Pipeline(object):
         :param width: The new width that the image should be resized to.
         :param height: The new height that the image should be resized to.
         :param resample_filter: The resampling filter to use. Must be one of
-         BICUBIC, BILINEAR, ANTIALIAS, or NEAREST.
+         BICUBIC, BILINEAR, ANTIALIAS, NEAREST, LANCZOS, BOX or HAMMING.
         :type probability: Float
         :type width: Integer
         :type height: Integer
