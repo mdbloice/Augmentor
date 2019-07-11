@@ -995,6 +995,10 @@ class Pipeline(object):
          of the input. Default value is None (points filled with black color).
          For example, in case of RGB color scheme simply use `(r, g, b)` tuple
          of int numbers.
+        :param mask_fillcolor: Specify color to fill points outside the boundaries
+         of the ground truth. Default value is None (points filled with black color).
+         For example, in case of RGB color scheme simply use `(r, g, b)` tuple
+         of int numbers.
         :return: None
         """
         self.add_operation(RotateStandard(probability=probability, max_left_rotation=ceil(max_left_rotation),
