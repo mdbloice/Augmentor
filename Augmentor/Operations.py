@@ -674,10 +674,20 @@ class RotateStandard(Operation):
             rotation = random_right
 
         def do(image):
-            return image.rotate(rotation, expand=self.expand, resample=Image.BICUBIC, fillcolor=self.fillcolor)
+            return image.rotate(
+                rotation,
+                expand=self.expand,
+                resample=Image.BICUBIC,
+                fillcolor=self.fillcolor,
+            )
 
         def do_mask(mask_image):
-            return mask_image.rotate(rotation, expand=self.expand, resample=Image.BICUBIC, fillcolor=self.mask_fillcolor)
+            return mask_image.rotate(
+                rotation,
+                expand=self.expand,
+                resample=Image.BICUBIC,
+                fillcolor=self.mask_fillcolor,
+            )
 
         augmented_images = []
 
