@@ -673,29 +673,23 @@ class RotateStandard(Operation):
         elif left_or_right == 1:
             rotation = random_right
 
-        def do(image):
+        def do(image, fillcolor):
             return image.rotate(
                 rotation,
                 expand=self.expand,
                 resample=Image.BICUBIC,
-                fillcolor=self.fillcolor,
-            )
-
-        def do_mask(mask_image):
-            return mask_image.rotate(
-                rotation,
-                expand=self.expand,
-                resample=Image.BICUBIC,
-                fillcolor=self.mask_fillcolor,
+                fillcolor=fillcolor,
             )
 
         augmented_images = []
 
         for i, image in enumerate(images):
+            # First image is the original - filling it with self.fillcolor
+            # All of the following images are masks - filling them with `self.mask_fillcolor`
             if i == 0:
-                augmented_images.append(do(image))
+                augmented_images.append(do(image, self.fillcolor))
             else:
-                augmented_images.append(do_mask(image))
+                augmented_images.append(do(image, self.mask_fillcolor))
 
         return augmented_images
 
