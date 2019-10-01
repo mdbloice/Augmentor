@@ -1484,7 +1484,7 @@ class Pipeline(object):
                                     skew_type="RANDOM",
                                     magnitude=magnitude))
 
-    def shear(self, probability, max_shear_left, max_shear_right):
+    def shear(self, probability, max_shear_left, max_shear_right, directions=['x','y']):
         """
         Shear the image by a specified number of degrees.
 
@@ -1498,6 +1498,8 @@ class Pipeline(object):
          Cannot be larger than 25 degrees.
         :param max_shear_right: The max number of degrees to shear to the
          right. Cannot be larger than 25 degrees.
+        :param directions: The directions to shear along.
+         Has to be one of ['x','y'], ['x'], and ['y']. Defaults to ['x','y']
         :return: None
         """
         if not 0 < probability <= 1:
@@ -1509,7 +1511,8 @@ class Pipeline(object):
         else:
             self.add_operation(Shear(probability=probability,
                                      max_shear_left=max_shear_left,
-                                     max_shear_right=max_shear_right))
+                                     max_shear_right=max_shear_right,
+                                     directions=directions))
 
     def greyscale(self, probability):
         """
