@@ -34,7 +34,7 @@ Once you have created a :class:`~Augmentor.Pipeline.Pipeline`, ``p``, we can beg
 
 .. code-block:: python
 
-    >>> p.rotate(probability=0.7, max_left=10, max_right=10)
+    >>> p.rotate(probability=0.7, max_left_rotation=10, max_right_rotation=10)
 
 In this case, we have added a :func:`~Augmentor.Pipeline.Pipeline.rotate` operation, that will execute with a probability of 70%, and have defined the maximum range by which an image will be rotated from between -10 and 10 degrees.
 
@@ -42,7 +42,7 @@ Next, we add a further operation, in this case a :func:`~Augmentor.Pipeline.Pipe
 
 .. code-block:: python
 
-    >>> p.zoom(probability=0.3, min_scale=1.1, max_scale=1.6)
+    >>> p.zoom(probability=0.3, min_factor=1.1, max_factor=1.6)
 
 This time, we have specified that we wish the operation to be applied with a probability of 30%, while the scale should be randomly selected from between 1.1 and 1.6
 

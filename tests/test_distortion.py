@@ -18,21 +18,23 @@ def test_in_memory_distortions():
     tmp, tmpdir = create_colour_temp_image((800, 800), "JPEG")
 
     r_d = Operations.Distort(probability=1, grid_width=8, grid_height=8, magnitude=8)
-    tmp_im = Image.open(tmp)
+    tmp_im = []
+    tmp_im.append(Image.open(tmp))
     tmp_im = r_d.perform_operation(tmp_im)
 
     assert tmp_im is not None
-    assert tmp_im.size == (800,800)
+    assert tmp_im[0].size == (800,800)
 
     tmp_bw, tmpdir_bw = create_greyscale_temp_image((800, 800), "PNG")
 
     r_d_bw = Operations.Distort(probability=1, grid_width=8, grid_height=8, magnitude=8)
-    tmp_im_bw = Image.open(tmp_bw)
+    tmp_im_bw = []
+    tmp_im_bw.append(Image.open(tmp_bw))
     tmp_im_bw = r_d_bw.perform_operation(tmp_im_bw)
 
     assert tmp_im_bw is not None
-    assert tmp_im_bw.size == (800,800)
-    assert isinstance(tmp_im_bw, Image.Image)
+    assert tmp_im_bw[0].size == (800,800)
+    assert isinstance(tmp_im_bw[0], Image.Image)
 
     tmp.close()
     tmp_bw.close()

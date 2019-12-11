@@ -3,10 +3,9 @@ os:
   - linux
 python:
   - "2.7"
-  - "3.3"
-  - "3.4"
   - "3.5"
   - "3.6"
+  - "3.7"
 # command to install dependencies
 install:
   # Install conda.
@@ -21,6 +20,8 @@ install:
   - source activate test-environment
   # Attempt to install torchvision; on failure, revert back to pre-conda environment.
   - conda install -q -y torchvision -c soumith || export PATH="$OPATH"
+  # Install pandas
+  - conda install -q -y pandas
   - pip install -r requirements.txt
 # command to run tests
 script: py.test -v

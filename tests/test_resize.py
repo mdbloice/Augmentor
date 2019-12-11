@@ -25,13 +25,16 @@ def test_resize_in_memory():
     im.save(tmp.name, 'JPEG')
 
     resize = Operations.Resize(probability=1, width=larger_dimensions[0], height=larger_dimensions[1], resample_filter="BICUBIC")
+
+    im = [im]
+
     im_resized = resize.perform_operation(im)
-    assert im_resized.size == larger_dimensions
+    assert im_resized[0].size == larger_dimensions
 
     resize_smaller = Operations.Resize(probability=1, width=smaller_dimensions[0], height=smaller_dimensions[1], resample_filter="BICUBIC")
     im_resized_smaller = resize_smaller.perform_operation(im)
 
-    assert im_resized_smaller.size == smaller_dimensions
+    assert im_resized_smaller[0].size == smaller_dimensions
 
     tmp.close()
 

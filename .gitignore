@@ -7,7 +7,7 @@
 .Trashes
 ehthumbs.db
 Thumbs.db
-# My additions 
+# My additions
 *.pyc
 *.egg
 *.egg-info
@@ -17,6 +17,7 @@ data/
 build/
 back/
 .cache/
+.pytest_cache/
 .tox/
 _build/
 _static/

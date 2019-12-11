@@ -1,13 +1,14 @@
 ![AugmentorLogo](https://github.com/mdbloice/AugmentorFiles/blob/master/Misc/AugmentorLogo.png)
 
-Augmentor is an image augmentation library in Python for machine learning. It aims to make image augmentation platform and framework independent, more convenient, less error prone, and reproducible. It employs a stochastic approach using building blocks that allow for operations to be pieced together in a pipeline.
+Augmentor is an image augmentation library in Python for machine learning. It aims to be a standalone library that is platform and framework independent, which is more convenient, allows for finer grained control over augmentation, and implements the most real-world relevant augmentation techniques. It employs a stochastic approach using building blocks that allow for operations to be pieced together in a pipeline.
 
-[![PyPI](https://img.shields.io/badge/Augmentor-v0.1.10-blue.svg?maxAge=2592000)](https://pypi.python.org/pypi/Augmentor)
+[![PyPI](https://img.shields.io/badge/Augmentor-v0.2.7-blue.svg?maxAge=2592000)](https://pypi.python.org/pypi/Augmentor)
+[![Supported Python Versions](https://img.shields.io/badge/python-2.7%20%7C%203.4%20%7C%203.5%20%7C%203.6%20%7C%203.7-blue.svg)](https://pypi.python.org/pypi/Augmentor)
 [![Documentation Status](https://readthedocs.org/projects/augmentor/badge/?version=master)](https://augmentor.readthedocs.io/en/master/?badge=master)
 [![Build Status](https://travis-ci.org/mdbloice/Augmentor.svg?branch=master)](https://travis-ci.org/mdbloice/Augmentor)
 [![License](http://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat)](LICENSE.md)
-[![Project Status: WIP - Initial development is in progress, but there has not yet been a stable, usable release suitable for the public.](http://www.repostatus.org/badges/latest/wip.svg)](http://www.repostatus.org/#wip)
-[![Supported Python Versions](https://img.shields.io/badge/python-2.7%2C%203.3--3.6-blue.svg)](https://pypi.python.org/pypi/Augmentor)
+[![Project Status: Active – The project has reached a stable, usable state and is being actively developed.](http://www.repostatus.org/badges/latest/active.svg)](http://www.repostatus.org/#active)
+[![Binder](https://mybinder.org/badge.svg)](https://mybinder.org/v2/gh/4QuantOSS/Augmentor/master)
 
 ## Installation
 
@@ -40,8 +41,8 @@ p = Augmentor.Pipeline("/path/to/images")
 You can then add operations to the Pipeline object `p` as follows:
 
 ```python
-p.rotate(probability=0.7, max_left=10, max_right=10)
-p.zoom(probability=0.5, min_scale=1.1, max_scale=1.5)
+p.rotate(probability=0.7, max_left_rotation=10, max_right_rotation=10)
+p.zoom(probability=0.5, min_factor=1.1, max_factor=1.5)
 ```
 
 Every function requires you to specify a probability, which is used to decide if an operation is applied to an image as it is passed through the augmentation pipeline.
@@ -82,6 +83,77 @@ imgs_, labels_ = np_p.sample(10)
 ```
 
 ### Keras and PyTorch
+If you wish to process each image in the pipeline exactly once, use `process()`:
+
+```python
+p.process()0
+```
+
+This function might be useful for resizing a dataset for example. It would make sense to create a pipeline where all of its operations have their probability set to `1` when using the `process()` method.
+
+### Multi-threading
+
+Augmentor (version >=0.2.1) now uses multi-threading to increase the speed of generating images.
+
+This *may* slow down some pipelines if the original images are very small. Set `multi_threaded` to ``False`` if slowdown is experienced:
+
+```python
+p.sample(100, multi_threaded=False)
+```
+
+However, by default the `sample()` function uses multi-threading. This is currently only implemented when saving to disk. Generators will use multi-threading in the next version update.
+
+
+### Ground Truth Data
+
+Images can be passed through the pipeline in groups of two or more so that ground truth data can be identically augmented.
+
+| Original image and mask<sup>[3]</sup>                                                                               | Augmented original and mask images                                                                               |
+|---------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------|
+| ![OriginalMask](https://raw.githubusercontent.com/mdbloice/AugmentorFiles/master/UsageGuide/original-with-mask.png) | ![AugmentedMask](https://raw.githubusercontent.com/mdbloice/AugmentorFiles/master/UsageGuide/ground-truth.gif)   |
+
+To augment ground truth data in parallel to any original data, add a ground truth directory to a pipeline using the [ground_truth()](https://augmentor.readthedocs.io/en/master/code.html#Augmentor.Pipeline.Pipeline.ground_truth) function:
+
+```python
+p = Augmentor.Pipeline("/path/to/images")
+# Point to a directory containing ground truth data.
+# Images with the same file names will be added as ground truth data
+# and augmented in parallel to the original data.
+p.ground_truth("/path/to/ground_truth_images")
+# Add operations to the pipeline as normal:
+p.rotate(probability=1, max_left_rotation=5, max_right_rotation=5)
+p.flip_left_right(probability=0.5)
+p.zoom_random(probability=0.5, percentage_area=0.8)
+p.flip_top_bottom(probability=0.5)
+p.sample(50)
+```
+
+### Multiple Mask/Image Augmentation
+
+Using the `DataPipeline` class (Augmentor version >= 0.2.3), images that have multiple associated masks can be augmented:
+
+| Multiple Mask Augmentation                                                                               |
+|----------------------------------------------------------------------------------------------------------|
+| ![MultipleMask](https://github.com/mdbloice/AugmentorFiles/blob/master/UsageGuide/merged-multi-mask.gif) |
+
+Arbitrarily long lists of images can be passed through the pipeline in groups and augmented identically using the `DataPipeline` class. This is useful for ground truth images that have several masks, for example.
+
+In the example below, the images and their masks are contained in the `images` data structure (as lists of lists), while their labels are contained in `y`:
+
+```python
+p = Augmentor.DataPipeline(images, y)
+p.rotate(1, max_left_rotation=5, max_right_rotation=5)
+p.flip_top_bottom(0.5)
+p.zoom_random(1, percentage_area=0.5)
+
+augmented_images, labels = p.sample(100)
+```
+
+The `DataPipeline` returns images directly (`augmented_images` above), and does not save them to disk, nor does it read data from the disk. Images are passed directly to `DataPipeline` during initialisation.
+
+For details of the `images` data structure and how to create it, see the [`Multiple-Mask-Augmentation.ipynb`](https://github.com/mdbloice/Augmentor/blob/master/notebooks/Multiple-Mask-Augmentation.ipynb) Jupyter notebook.
+
+### Generators for Keras and PyTorch
 
 If you do not wish to save to disk, you can use a generator (in this case with Keras):
 
@@ -275,6 +347,8 @@ You can use `urllib` to obtain the skin lesion image in order to reproduce the a
 
 Note: For Python 3, use `from urllib.request import urlretrieve`.
 
+Logo created at [LogoMakr.com](https://logomakr.com)
+
 ## Tests
 To run the automated tests, clone the repository and run:
 
@@ -287,7 +361,7 @@ from the command line. To view the CI tests that are run after each commit, see 
 ## Citing Augmentor
 If you find this package useful and wish to cite it, you can use
 
-Marcus D. Bloice, Christof Stocker, and Andreas Holzinger, *Augmentor: An Image Augmentation Library for Machine Learning*, arXiv preprint **arXiv:1708.04680**, <https://arxiv.org/abs/1708.04680>, 2017.
+Marcus D Bloice, Peter M Roth, Andreas Holzinger, Biomedical image augmentation using Augmentor, *Bioinformatics*, <https://doi.org/10.1093/bioinformatics/btz259>
 
 ## Asciicast
 

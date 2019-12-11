@@ -1,0 +1,20 @@
+name: augmentor_notebooks
+channels:
+  - menpo
+  - soumith
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.6
+  - numpy
+  - matplotlib
+  - pandas
+  - h5py
+  - scikit-image<=0.20
+  - scikit-learn<=0.20
+  - pytorch<=0.3.0
+  - torchvision
+  - opencv3>=3.0
+  - tensorflow
+  - pip:
+    - keras==2.1.3

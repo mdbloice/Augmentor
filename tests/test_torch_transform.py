@@ -6,6 +6,7 @@ import PIL.Image as Image
 
 import Augmentor
 
+
 def test_torch_transform():
     torchvision = pytest.importorskip("torchvision")
 
@@ -13,13 +14,21 @@ def test_torch_transform():
     red[..., 0] = 255
     red = Image.fromarray(red)
 
-    g = Augmentor.Operations.Greyscale(1)
-
     p = Augmentor.Pipeline()
-    p.greyscale(1)
+
+    # include multiple transforms to test integration
+    p.greyscale(probability=1)
+    p.zoom(probability=1, min_factor=1.0, max_factor=1.0)
+    p.rotate_random_90(probability=1)
+
     transforms = torchvision.transforms.Compose([
         p.torch_transform()
     ])
 
     assert red != transforms(red)
-    assert g.perform_operation(red) == transforms(red)
+
+    # assert that all operations were correctly applied
+    result = red
+    for op in p.operations:
+        result = op.perform_operation([result])[0]
+    assert transforms(red) == result

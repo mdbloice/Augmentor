@@ -1,5 +1,5 @@
 # ImageUtilities.py
-# Author: Marcus D. Bloice <https://github.com/mdbloice>
+# Author: Marcus D. Bloice <https://github.com/mdbloice> and contributors
 # Licensed under the terms of the MIT Licence.
 """
 The ImageUtilities module provides a number of helper functions, as well as
@@ -17,6 +17,7 @@ import random
 import warnings
 import numpy as np
 
+
 class AugmentorImage(object):
     """
     Wrapper class containing paths to images, as well as a number of other
@@ -26,7 +27,13 @@ class AugmentorImage(object):
     Each image that is found by Augmentor during the initialisation of a
     Pipeline object is contained with a new AugmentorImage object.
     """
-    def __init__(self, image_path, output_directory):
+    def __init__(self,
+                 image_path,
+                 output_directory,
+                 pil_images=None,
+                 array_images=None,
+                 path_images=None,
+                 class_label_int=None):
         """
         To initialise an AugmentorImage object for any image, the image's
         file path is required, as well as that image's output directory,
@@ -36,22 +43,72 @@ class AugmentorImage(object):
         :param output_directory: The directory where augmented images for this
          image should be saved.
         """
-        # Just to stop Pylint complaining about initialising these outside
-        # of __init__ which is not actually happening, as the are being
-        # initialised in the setters from within init, but anyway I shall obey.
+
+        # Could really think about initialising AugmentorImage member
+        # variables here and and only here during init. Then remove all
+        # setters below so that they cannot be altered later.
+
+        # Call the setters from parameters that are required.
+        self._image_path = image_path
+        self._output_directory = output_directory
+
         self._ground_truth = None
-        self._image_path = None
-        self._output_directory = None
-        self._file_format = None  # TODO: pass this for each image.
-        self._image_PIL = None
+
+        self._image_paths = None
+        self._image_arrays = None
+        self._pil_images = None
+
+        self._file_format = None
         self._class_label = None
         self._class_label_int = None
+        self._label = None
         self._label_pair = None
         self._categorical_label = None
 
-        # Now we call the setters that we require.
-        self.image_path = image_path
-        self.output_directory = output_directory
+        if pil_images is not None:
+            self._pil_images = pil_images
+
+        if array_images is not None:
+            self._array_images = array_images
+
+        if path_images is not None:
+            self._path_images = path_images
+
+        if class_label_int is not None:
+            self._class_label_int = class_label_int
+
+    def __str__(self):
+        return """
+        Image path: %s
+        Ground truth path: %s
+        File format (inferred from extension): %s
+        Class label: %s
+        Numerical class label (auto assigned): %s
+        """ % (self._image_path, self._ground_truth, self._file_format, self._class_label, self._class_label_int)
+
+    @property
+    def pil_images(self):
+        return self._pil_images
+
+    @pil_images.setter
+    def pil_images(self, value):
+        self._pil_images = value
+
+    @property
+    def image_arrays(self):
+        return self._image_arrays
+
+    @image_arrays.setter
+    def image_arrays(self, value):
+        self._image_arrays = value
+
+    @property
+    def class_label_int(self):
+        return self._class_label_int
+
+    @class_label_int.setter
+    def class_label_int(self, value):
+        self._class_label_int = value
 
     @property
     def output_directory(self):
@@ -84,18 +141,10 @@ class AugmentorImage(object):
     @image_path.setter
     def image_path(self, value):
         self._image_path = value
-        #if os.path.exists(value):
-        #    self._image_path = value
-        #else:
-        #    raise IOError("The file specified does not exist.")
 
     @property
-    def image_PIL(self):
-        return self._image_PIL
-
-    @image_PIL.setter
-    def image_PIL(self, value):
-        self._image_PIL = value
+    def pil_images(self):
+        return self._pil_images
 
     @property
     def image_file_name(self):
@@ -107,7 +156,7 @@ class AugmentorImage(object):
         :getter: Returns this image's file name.
         :type: String
         """
-        return os.path.basename(self.image_path)
+        return os.path.basename(self._image_path)
 
     @property
     def class_label(self):
@@ -118,12 +167,12 @@ class AugmentorImage(object):
         self._class_label = value
 
     @property
-    def class_label_int(self):
-        return self._class_label_int
+    def label(self):
+        return self._label
 
-    @class_label_int.setter
-    def class_label_int(self, value):
-        self._class_label_int = value
+    @label.setter
+    def label(self, value):
+        self._label = value
 
     @property
     def categorical_label(self):
@@ -147,13 +196,21 @@ class AugmentorImage(object):
 
     @ground_truth.setter
     def ground_truth(self, value):
-        # TODO: Include some kind of fuzzy search.
         if os.path.isfile(value):
             self._ground_truth = value
 
     @property
     def label_pair(self):
-        return self.class_label_int, self.class_label
+        return self._class_label_int, self._class_label
+
+    @property
+    def file_format(self):
+        return self._file_format
+
+    @file_format.setter
+    def file_format(self, value):
+        self._file_format = value
+
 
 def parse_user_parameter(user_param):
 
@@ -183,7 +240,7 @@ def extract_paths_and_extensions(image_path):
 
 def scan(source_directory, output_directory):
 
-    abs_output_directory  = os.path.abspath(output_directory)
+    abs_output_directory = os.path.abspath(output_directory)
     files_and_directories = glob.glob(os.path.join(os.path.abspath(source_directory), '*'))
 
     directory_count = 0
@@ -212,9 +269,10 @@ def scan(source_directory, output_directory):
             a.class_label = parent_directory_name
             a.class_label_int = label_counter
             a.categorical_label = [label_counter]
+            a.file_format = os.path.splitext(image_path)[1].split(".")[1]
             augmentor_images.append(a)
 
-            class_labels.append((label_counter, parent_directory_name))
+        class_labels.append((label_counter, parent_directory_name))
 
         return augmentor_images, class_labels
 
@@ -228,8 +286,9 @@ def scan(source_directory, output_directory):
                 a = AugmentorImage(image_path=image_path, output_directory=output_directory)
                 a.class_label = os.path.split(d)[1]
                 a.class_label_int = label_counter
-                categorical_label[label_counter] = 1
+                categorical_label[label_counter] = 1  # Set to 1 with the index of the current class.
                 a.categorical_label = categorical_label
+                a.file_format = os.path.splitext(image_path)[1].split(".")[1]
                 augmentor_images.append(a)
             class_labels.append((os.path.split(d)[1], label_counter))
             label_counter += 1
@@ -237,18 +296,48 @@ def scan(source_directory, output_directory):
         return augmentor_images, class_labels
 
 
+def scan_dataframe(source_dataframe, image_col, category_col, output_directory):
+    try:
+        import pandas as pd
+    except ImportError:
+        raise ImportError('Pandas is required to use the scan_dataframe function!\nrun pip install pandas and try again')
+
+    # ensure column is categorical
+    cat_col_series = pd.Categorical(source_dataframe[category_col])
+    abs_output_directory = os.path.abspath(output_directory)
+    class_labels = list(enumerate(cat_col_series.categories))
+
+    augmentor_images = []
+
+    for image_path, cat_name, cat_id in zip(source_dataframe[image_col].values,
+                                            cat_col_series.get_values(),
+                                            cat_col_series.codes):
+
+        a = AugmentorImage(image_path=image_path, output_directory=abs_output_directory)
+        a.class_label = cat_name
+        a.class_label_int = cat_id
+        categorical_label = np.zeros(len(class_labels), dtype=np.uint32)
+        categorical_label[cat_id] = 1
+        a.categorical_label = categorical_label
+        a.file_format = os.path.splitext(image_path)[1].split(".")[1]
+        augmentor_images.append(a)
+
+    return augmentor_images, class_labels
+
+
 def scan_directory(source_directory):
     """
     Scan a directory for images, returning any images found with the
     extensions ``.jpg``, ``.JPG``, ``.jpeg``, ``.JPEG``, ``.gif``, ``.GIF``,
-    ``.img``, ``.IMG``, ``.png`` or ``.PNG``.
+    ``.img``, ``.IMG``, ``.png``, ``.PNG``, ``.tif``, ``.TIF``, ``.tiff``,
+    or ``.TIFF``.
 
     :param source_directory: The directory to scan for images.
     :type source_directory: String
     :return: A list of images found in the :attr:`source_directory`
     """
     # TODO: GIFs are highly problematic. It may make sense to drop GIF support.
-    file_types = ['*.jpg', '*.bmp', '*.jpeg', '*.gif', '*.img', '*.png']
+    file_types = ['*.jpg', '*.bmp', '*.jpeg', '*.gif', '*.img', '*.png', '*.tiff', '*.tif']
 
     list_of_files = []
 

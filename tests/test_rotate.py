@@ -4,12 +4,11 @@ sys.path.insert(0, os.path.abspath('.'))
 
 import tempfile
 import shutil
-
 from PIL import Image
 from Augmentor import Operations
 
-def rotate_images(tmpdir, rot):
 
+def rotate_images(tmpdir, rot):
     original_dimensions = (800, 800)
 
     im_tmp = tmpdir.mkdir("subfolder").join('test.JPEG')
@@ -17,10 +16,11 @@ def rotate_images(tmpdir, rot):
     im.save(str(im_tmp), 'JPEG')
 
     r = Operations.Rotate(probability=1, rotation=rot)
+    im = [im]
     im_r = r.perform_operation(im)
 
     assert im_r is not None
-    assert im_r.size == original_dimensions
+    assert im_r[0].size == original_dimensions
 
 
 def test_rotate_images_90(tmpdir):
@@ -45,10 +45,11 @@ def test_rotate_images_custom_temp_files():
     im.save(tmp.name, 'JPEG')
 
     r = Operations.Rotate(probability=1, rotation=90)
+    im = [im]
     im_r = r.perform_operation(im)
 
     assert im_r is not None
-    assert im_r.size == original_dimensions
+    assert im_r[0].size == original_dimensions
 
     tmp.close()
     shutil.rmtree(tmpdir)

@@ -1,4 +1,5 @@
 Pillow
 future
+futures
 tqdm
 numpy
