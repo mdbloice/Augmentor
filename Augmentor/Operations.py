@@ -29,12 +29,12 @@ import math
 from math import floor, ceil
 
 import numpy as np
-# from skimage import img_as_ubyte
-# from skimage import transform
 
 import os
 import random
 import warnings
+import cv2
+from skimage.draw import line
 
 # Python 2-3 compatibility - not currently needed.
 # try:
@@ -726,6 +726,135 @@ class Rotate(Operation):
                 return image.rotate(90 * random_factor, expand=True)
             else:
                 return image.rotate(self.rotation, expand=True)
+
+        augmented_images = []
+
+        for image in images:
+            augmented_images.append(do(image))
+
+        return augmented_images
+
+
+class LinearMotion(Operation):
+    """
+    This class is used to perform linear motion on images.
+    The algorithm is heavily based on https://github.com/lospooky/pyblur/tree/master/pyblur
+    """
+
+    def __init__(self, probability, size, angle, linetype):
+        """
+        :param probability: Controls the probability that the operation is
+         performed when it is invoked in the pipeline.
+        :param size: size of linear motion kernel
+        :param angle: angle of linear motion
+        :param linetype: type of linear motion line
+
+        """
+        Operation.__init__(self, probability)
+        self.size = size
+        self.angle = angle
+        self.line_dict = self.gen_motion_lines()
+        self.kernel = self.get_kernel(size, angle, linetype)
+
+    def get_kernel(self, size, angle, linetype):
+        kernel_width = size
+        kernel_center = int(math.floor(size / 2))
+        angle = self.get_sanitize_angle_value(kernel_center, angle)
+        kernel = np.zeros((kernel_width, kernel_width), dtype=np.float32)
+        line_anchors = self.line_dict[size][angle]
+        if (linetype == 'right'):
+            line_anchors[0] = kernel_center
+            line_anchors[1] = kernel_center
+        if (linetype == 'left'):
+            line_anchors[2] = kernel_center
+            line_anchors[3] = kernel_center
+        rr, cc = line(line_anchors[0], line_anchors[1], line_anchors[2], line_anchors[3])
+        kernel[rr, cc] = 1
+        normalization_factor = np.count_nonzero(kernel)
+        kernel = kernel / normalization_factor
+        return kernel
+
+    def get_nearest_value(self, theta, valid_angles):
+        idx = (np.abs(valid_angles - theta)).argmin()
+        return valid_angles[idx]
+
+    def get_sanitize_angle_value(self, kernel_center, angle):
+        num_distinct_lines = kernel_center * 4
+        angle = math.fmod(angle, 180.0)
+        valid_line_angles = np.linspace(0, 180, num_distinct_lines, endpoint=False)
+        angle = self.get_nearest_value(angle, valid_line_angles)
+        return angle
+
+    def gen_motion_lines(self):
+
+        ret = {}
+        # 3x3 lines
+        lines = {}
+        lines[0] = [1, 0, 1, 2]
+        lines[45] = [2, 0, 0, 2]
+        lines[90] = [0, 1, 2, 1]
+        lines[135] = [0, 0, 2, 2]
+        ret[3] = lines
+
+        # 5x5 lines
+        lines = {}
+        lines[0] = [2, 0, 2, 4]
+        lines[22.5] = [3, 0, 1, 4]
+        lines[45] = [0, 4, 4, 0]
+        lines[67.5] = [0, 3, 4, 1]
+        lines[90] = [0, 2, 4, 2]
+        lines[112.5] = [0, 1, 4, 3]
+        lines[135] = [0, 0, 4, 4]
+        lines[157.5] = [1, 0, 3, 4]
+        ret[5] = lines
+
+        # 7x7 lines
+        lines = {}
+        lines[0] = [3, 0, 3, 6]
+        lines[15] = [4, 0, 2, 6]
+        lines[30] = [5, 0, 1, 6]
+        lines[45] = [6, 0, 0, 6]
+        lines[60] = [6, 1, 0, 5]
+        lines[75] = [6, 2, 0, 4]
+        lines[90] = [0, 3, 6, 3]
+        lines[105] = [0, 2, 6, 4]
+        lines[120] = [0, 1, 6, 5]
+        lines[135] = [0, 0, 6, 6]
+        lines[150] = [1, 0, 5, 6]
+        lines[165] = [2, 0, 4, 6]
+        ret[7] = lines
+
+        # 9x9 lines
+        lines = {}
+        lines[0] = [4, 0, 4, 8]
+        lines[11.25] = [5, 0, 3, 8]
+        lines[22.5] = [6, 0, 2, 8]
+        lines[33.75] = [7, 0, 1, 8]
+        lines[45] = [8, 0, 0, 8]
+        lines[56.25] = [8, 1, 0, 7]
+        lines[67.5] = [8, 2, 0, 6]
+        lines[78.75] = [8, 3, 0, 5]
+        lines[90] = [8, 4, 0, 4]
+        lines[101.25] = [0, 3, 8, 5]
+        lines[112.5] = [0, 2, 8, 6]
+        lines[123.75] = [0, 1, 8, 7]
+        lines[135] = [0, 0, 8, 8]
+        lines[146.25] = [1, 0, 7, 8]
+        lines[157.5] = [2, 0, 6, 8]
+        lines[168.75] = [3, 0, 5, 8]
+        ret[9] = lines
+
+        return ret
+
+    def perform_operation(self, images):
+        """
+        """
+
+        def do(image):
+            img_np = np.array(image)
+            img_np_filtered = cv2.filter2D(img_np, -1, self.kernel)
+
+            return Image.fromarray(img_np_filtered)
 
         augmented_images = []
 
@@ -1832,7 +1961,6 @@ class HSVShifting(Operation):
         self.value_shift = value_shift
 
     def perform_operation(self, images):
-
         def do(image):
             hsv = np.array(image.convert("HSV"), 'float64')
             hsv /= 255.
