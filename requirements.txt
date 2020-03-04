@@ -3,3 +3,4 @@ future
 futures
 tqdm
 numpy
+opencv-python
