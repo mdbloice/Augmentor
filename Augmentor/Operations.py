@@ -634,7 +634,15 @@ class RotateStandard(Operation):
     .. seealso:: For 90 degree rotations, see the :class:`Rotate` class.
     """
 
-    def __init__(self, probability, max_left_rotation, max_right_rotation, expand=False, fillcolor=None):
+    def __init__(
+            self,
+            probability,
+            max_left_rotation,
+            max_right_rotation,
+            expand=False,
+            fillcolor=None,
+            mask_fillcolor=None,
+    ):
         """
         Documentation to appear.
         """
@@ -643,6 +651,7 @@ class RotateStandard(Operation):
         self.max_right_rotation = abs(max_right_rotation)  # Ensure always positive
         self.expand = expand
         self.fillcolor = fillcolor
+        self.mask_fillcolor = mask_fillcolor
 
     def perform_operation(self, images):
         """
@@ -652,7 +661,6 @@ class RotateStandard(Operation):
         :return: The transformed image(s) as a list of object(s) of type
          PIL.Image.
         """
-
         random_left = random.randint(self.max_left_rotation, 0)
         random_right = random.randint(0, self.max_right_rotation)
 
@@ -665,13 +673,23 @@ class RotateStandard(Operation):
         elif left_or_right == 1:
             rotation = random_right
 
-        def do(image):
-            return image.rotate(rotation, expand=self.expand, resample=Image.BICUBIC, fillcolor=self.fillcolor)
+        def do(image, fillcolor):
+            return image.rotate(
+                rotation,
+                expand=self.expand,
+                resample=Image.BICUBIC,
+                fillcolor=fillcolor,
+            )
 
         augmented_images = []
 
-        for image in images:
-            augmented_images.append(do(image))
+        for i, image in enumerate(images):
+            # First image is the original - filling it with self.fillcolor
+            # All of the following images are masks - filling them with `self.mask_fillcolor`
+            if i == 0:
+                augmented_images.append(do(image, self.fillcolor))
+            else:
+                augmented_images.append(do(image, self.mask_fillcolor))
 
         return augmented_images
 
