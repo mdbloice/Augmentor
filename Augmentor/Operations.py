@@ -1154,7 +1154,7 @@ class Shear(Operation):
 
     For sample code with image examples see :ref:`shearing`.
     """
-    def __init__(self, probability, max_shear_left, max_shear_right):
+    def __init__(self, probability, max_shear_left, max_shear_right, directions=['x','y']):
         """
         The shearing is randomised in magnitude, from 0 to the
         :attr:`max_shear_left` or 0 to :attr:`max_shear_right` where the
@@ -1171,6 +1171,7 @@ class Shear(Operation):
         :type max_shear_right: Integer
         """
         Operation.__init__(self, probability)
+        self.directions = directions
         self.max_shear_left = max_shear_left
         self.max_shear_right = max_shear_right
 
@@ -1227,7 +1228,7 @@ class Shear(Operation):
         # any of the affine transformation matrices, seen here:
         # https://en.wikipedia.org/wiki/Transformation_matrix#/media/File:2D_affine_transformation_matrix.svg
 
-        directions = ["x", "y"]
+        directions = self.directions # ["x", "y"]
         direction = random.choice(directions)
 
         def do(image):
