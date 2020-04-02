@@ -354,6 +354,9 @@ class Pipeline(object):
 
         if n == 0:
             augmentor_images = self.augmentor_images
+        elif n < 0:
+            n_duplicates = abs(n)
+            augmentor_images = n_duplicates*self.augmentor_images
         else:
             augmentor_images = [random.choice(self.augmentor_images) for _ in range(n)]
 
