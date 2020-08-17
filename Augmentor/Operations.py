@@ -42,6 +42,11 @@ import warnings
 # except ImportError:
 #    from io import StringIO
 
+PIL_filters = {
+        'NEAREST' : Image.NEAREST,
+        'BILINEAR': Image.BILINEAR,
+        'BICUBIC' : Image.BICUBIC
+    }
 
 class Operation(object):
     """
@@ -1356,7 +1361,7 @@ class Distort(Operation):
     """
     This class performs randomised, elastic distortions on images.
     """
-    def __init__(self, probability, grid_width, grid_height, magnitude):
+    def __init__(self, probability, grid_width, grid_height, magnitude, resample="BICUBIC"):
         """
         As well as the probability, the granularity of the distortions
         produced by this class can be controlled using the width and
@@ -1385,6 +1390,7 @@ class Distort(Operation):
         self.magnitude = abs(magnitude)
         # TODO: Implement non-random magnitude.
         self.randomise_magnitude = True
+        self.resample_method = PIL_filters[resample]
 
     def perform_operation(self, images):
         """
@@ -1486,7 +1492,7 @@ class Distort(Operation):
 
         def do(image):
 
-            return image.transform(image.size, Image.MESH, generated_mesh, resample=Image.BICUBIC)
+            return image.transform(image.size, Image.MESH, generated_mesh, resample=self.resample_method)
 
         augmented_images = []
 
@@ -1500,7 +1506,7 @@ class GaussianDistortion(Operation):
     """
     This class performs randomised, elastic gaussian distortions on images.
     """
-    def __init__(self, probability, grid_width, grid_height, magnitude, corner, method, mex, mey, sdx, sdy):
+    def __init__(self, probability, grid_width, grid_height, magnitude, corner, method, mex, mey, sdx, sdy, resample='BICUBIC'):
         """
         As well as the probability, the granularity of the distortions
         produced by this class can be controlled using the width and
@@ -1560,6 +1566,7 @@ class GaussianDistortion(Operation):
         self.mey = mey
         self.sdx = sdx
         self.sdy = sdy
+        self.resample_method = PIL_filters[resample]
 
     def perform_operation(self, images):
         """
@@ -1686,7 +1693,7 @@ class GaussianDistortion(Operation):
             for i in range(len(dimensions)):
                 generated_mesh.append([dimensions[i], polygons[i]])
 
-            return image.transform(image.size, Image.MESH, generated_mesh, resample=Image.BICUBIC)
+            return image.transform(image.size, Image.MESH, generated_mesh, resample=self.resample_method)
 
         augmented_images = []
 
