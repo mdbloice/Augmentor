@@ -208,7 +208,7 @@ class Pipeline(object):
         sys.stdout.write("Initialised with %s image(s) found.\n" % len(self.augmentor_images))
         sys.stdout.write("Output directory set to %s." % abs_output_directory)
 
-    def _execute(self, augmentor_image, save_to_disk=True, multi_threaded=True):
+    def _execute(self, augmentor_image, save_to_disk=True, multi_threaded=False):
         """
         Private method. Used to pass an image through the current pipeline,
         and return the augmented image.
@@ -244,23 +244,25 @@ class Pipeline(object):
             else:
                 images_gt.append(Image.open(augmentor_image.ground_truth))
 
+        len_images_origin = len(images_origin)
+        len_images_pil = len(images_pil)
+        len_images_gt = len(images_gt)
+
+        images = images_origin + images_pil + images_gt
+
         for operation in self.operations:
             r = round(random.uniform(0, 1), 1)
             if r <= operation.probability:
                 if operation.skip_gt_image is True:
-                    if len(images_origin) > 0:
-                        images_origin = operation.perform_operation(images_origin)
-                    if len(images_pil) > 0:
-                        images_pil = operation.perform_operation(images_pil)
+                    if len(images) > 0:
+                        images[0 : len_images_origin + len_images_pil] = operation.perform_operation(
+                            images[0 : len_images_origin + len_images_pil]
+                        )
                 else:
-                    if len(images_origin) > 0:
-                        images_origin = operation.perform_operation(images_origin)
-                    if len(images_pil) > 0:
-                        images_pil = operation.perform_operation(images_pil)
-                    if len(images_gt) > 0:
-                        images_gt = operation.perform_operation(images_gt)
-
-        images = images_origin + images_pil + images_gt
+                    if len(images) > 0:
+                        images[0 : len_images_origin + len_images_pil + len_images_gt] = operation.perform_operation(
+                            images[0 : len_images_origin + len_images_pil + len_images_gt]
+                        )
 
         # TEMP FOR TESTING
         # save_to_disk = False
@@ -369,7 +371,7 @@ class Pipeline(object):
         else:
             self.save_format = save_format
 
-    def sample(self, n, multi_threaded=True):
+    def sample(self, n, multi_threaded=False):
         """
         Generate :attr:`n` number of samples from the current pipeline.
 
