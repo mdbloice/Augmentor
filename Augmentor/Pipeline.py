@@ -236,7 +236,8 @@ class Pipeline(object):
         # save_to_disk = False
 
         if save_to_disk:
-            file_name = str(uuid.uuid4())
+            filename, ext = os.path.splitext(os.path.basename(augmentor_image.image_path))
+            file_name = "{}_{}.{}".format(filename, str(uuid.uuid4()), self.save_format)
             try:
                 for i in range(len(images)):
                     if i == 0:
@@ -1010,6 +1011,21 @@ class Pipeline(object):
             raise ValueError(Pipeline._probability_error_text)
         else:
             self.add_operation(Flip(probability=probability, top_bottom_left_right="TOP_BOTTOM"))
+
+    def linear_motion(self, probability, size, angle, linetype="left"):
+        """
+        Perform linear motion blurring
+
+        :param probability: A value between 0 and 1 representing the
+         probability that the operation should be performed.
+        :param size: size of kernel
+        :param angle: motion angle3
+        :param linetype: type of line (left, right or full (both left and right))
+        """
+        if not 0 < probability <= 1:
+            raise ValueError(Pipeline._probability_error_text)
+        else:
+            self.add_operation(LinearMotion(probability=probability, size=size, angle=angle, linetype=linetype))
 
     def flip_left_right(self, probability):
         """

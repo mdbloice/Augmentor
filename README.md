@@ -56,6 +56,34 @@ p.sample(10000)
 
 which will generate 10,000 augmented images based on your specifications. By default these will be written to the disk in a directory named `output` relative to the path specified when initialising the `p` pipeline object above.
 
+### Numpy
+
+If you want to work with numpy array, you can use the NumpyPipeline:
+
+```python
+
+# Read examples image
+img1 = cv2.imread("tmp/000.jpg", 1)
+img2 = cv2.imread("tmp/000.jpg", 1)
+label1 = "1"
+label2 = "2"
+
+# Create list of images
+imgs = [img1, img2]
+labels = [label1, label2]
+
+# Create numpy pipline
+np_p = Augmentor.NumpyPipeline(imgs, labels)
+
+# Add operations
+np_p.flip_top_bottom(probability=0.5)
+
+# generate 10 samples
+imgs_, labels_ = np_p.sample(10)
+
+```
+
+### Keras and PyTorch
 If you wish to process each image in the pipeline exactly once, use `process()`:
 
 ```python
