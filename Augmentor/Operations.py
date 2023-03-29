@@ -35,6 +35,8 @@ import numpy as np
 import os
 import random
 import warnings
+# Added CLAHE algorithm from CV2
+import cv2
 
 # Python 2-3 compatibility - not currently needed.
 # try:
@@ -2127,4 +2129,52 @@ class Mixup(Operation):
         for image in images:
             augmented_images.append(do(image, image, y1, y2))
 
+        return augmented_images
+
+
+class Clahe(Operation):
+    """
+    This class : Clahe is used to perform Contrast Limited Adaptive Histogram Equalization
+    as it is implemented in the OpenCV2 library 4.1.1
+    """
+
+    def __init__(self, probability, clip_limit_min=0.0, clip_limit_max=40.0, tile_grid=(8, 8)):
+        """
+        Initializes parameters
+        :param probability: Controls the probability that the operation is
+        performed when it is inovked in the pipeline
+        :param clip_limit_min: Sets the contrast limit min value
+        :param clip_limit_max: Sets the contrast limit max value
+        :param tile_grid: it controls the size of the blocks that are to be histogram equalized. Default
+        value as described in docs.opencv.org is 8x8
+        """
+        Operation.__init__(self, probability)
+        self.clip_limit_min = clip_limit_min
+        self.clip_limit_max = clip_limit_max
+        self.tile_grid = tile_grid
+
+    def __str__(self):
+        return "Clahe contrast_limit_min: {}, contrast_limit_max {}, tile: {}".format(self.clip_limit_min,
+                                                                                      self.clip_limit_max,
+                                                                                      self.tile_grid)
+
+    def perform_operation(self, images):
+        """
+        Perform OpenCV Contrast Limited Adaptive Histogram Equalization
+        :param images: The image(s) to equalize
+        :return: The transformed image(s) as a list of object(s) of type PIL.Image.
+        """
+        def do(image):
+            if not image.mode == 'L':
+                img_grayscale = ImageOps.grayscale(image)
+            else:
+                img_grayscale = image
+
+            clip_limit_threshold = np.random.uniform(self.clip_limit_min, self.clip_limit_max)
+            img_cv2 = np.asarray(img_grayscale)
+            clahe_cv2 = cv2.createCLAHE(clipLimit=clip_limit_threshold, tileGridSize=self.tile_grid)
+            img_clahe = clahe_cv2.apply(img_cv2)
+            return img_clahe
+
+        augmented_images = [Image.fromarray(do(img)) for img in images]
         return augmented_images

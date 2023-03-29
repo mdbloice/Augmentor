@@ -1312,6 +1312,32 @@ class Pipeline(object):
         else:
             self.add_operation(HistogramEqualisation(probability=probability))
 
+    def clahe(self, probability, clip_limit_min, clip_limit_max, tile_grid):
+        """
+        Apply Contrast Limited Adaptive Histogram Equalization
+        In order to avoid noise amplification a contrast limited is required. If clip_limit_min and clip_limit_max
+        have different values, different CLAHE will be obtained randomly
+
+        If the user desires to use CLAHE as a preprocess by using the same clip_limit value, then set:
+        clip_limit_min = clip_limit_max
+
+        :param probability: The probability that the function will execute
+         when the image is passed through the pipeline.
+        :param clip_limit_min: min value of clip_limit.
+        :param clip_limit_max: max value of clip_limit
+        :param tile_grid: the number of pixels of the block to be equalized
+
+        More information consult at docs.opencv.org
+
+        """
+        if not 0 < probability <= 1:
+            raise ValueError(Pipeline._probability_error_text)
+        else:
+            self.add_operation(Clahe(probability=probability,
+                                     clip_limit_min=clip_limit_min,
+                                     clip_limit_max=clip_limit_max,
+                                     tile_grid=tile_grid))
+
     def scale(self, probability, scale_factor):
         """
         Scale (enlarge) an image, while maintaining its aspect ratio. This
