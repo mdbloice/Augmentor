@@ -1530,6 +1530,15 @@ class Pipeline(object):
         else:
             self.add_operation(Greyscale(probability=probability))
 
+    def hsvshifting(self, probability, hue_shift, saturation_scale, saturation_shift, value_scale, value_shift):
+        """
+        """
+        if not  0 < probability <= 1:
+            raise ValueError(Pipeline._probability_error_text)
+        else:
+            self.add_operation(HSVShifting(probability = probability,hue_shift = hue_shift, saturation_scale = saturation_scale, saturation_shift = saturation_shift, value_scale = value_scale, value_shift = value_shift))
+    
+    
     def black_and_white(self, probability, threshold=128):
         """
         Convert images to black and white. In other words convert the image

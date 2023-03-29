@@ -35,6 +35,7 @@ import numpy as np
 import os
 import random
 import warnings
+import cv2
 
 # Python 2-3 compatibility - not currently needed.
 # try:
@@ -1820,8 +1821,9 @@ class ZoomRandom(Operation):
 
 
 class HSVShifting(Operation):
+
     """
-    CURRENTLY NOT IMPLEMENTED.
+    Implementing HSV shifting augmentation to augmentor.
     """
     def __init__(self, probability, hue_shift, saturation_scale, saturation_shift, value_scale, value_shift):
         Operation.__init__(self, probability)
@@ -1834,11 +1836,15 @@ class HSVShifting(Operation):
     def perform_operation(self, images):
 
         def do(image):
-            hsv = np.array(image.convert("HSV"), 'float64')
-            hsv /= 255.
+            
+            image = image.convert("RGB")
+            image = np.array(image)
+            
+            hsv = cv2.cvtColor(image,cv2.COLOR_BGR2HSV)
+            hsv = hsv/255
 
             hsv[..., 0] += np.random.uniform(-self.hue_shift, self.hue_shift)
-            hsv[..., 1] *= np.random.uniform(1 / (1 + self.saturation_scale), 1 + self.saturation_scale)
+            hsv[..., 1] *= np.random.uniform(1 / (1 + self.saturation_scale), 1+ self.saturation_scale)
             hsv[..., 1] += np.random.uniform(-self.saturation_shift, self.saturation_shift)
             hsv[..., 2] *= np.random.uniform(1 / (1 + self.value_scale), 1 + self.value_scale)
             hsv[..., 2] += np.random.uniform(-self.value_shift, self.value_shift)
@@ -1846,7 +1852,10 @@ class HSVShifting(Operation):
             hsv.clip(0, 1, hsv)
             hsv = np.uint8(np.round(hsv * 255.))
 
-            return Image.fromarray(hsv, "HSV").convert("RGB")
+            hsv = cv2.cvtColor(hsv,cv2.COLOR_HSV2BGR)
+            img = Image.fromarray(hsv)
+            
+            return img
 
         augmented_images = []
 
