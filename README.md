@@ -1,3 +1,8 @@
+自用版本。更改了源码，现在可以单独选择某个operation是否同时作用于原图和label图。调用时添加 skip_gt_image=True 参数即可。如：
+p.random_contrast(probability=1, min_factor=0.5, max_factor=1.52, skip_gt_image=True)
+
+
+
 ![AugmentorLogo](https://github.com/mdbloice/AugmentorFiles/blob/master/Misc/AugmentorLogo.png)
 
 Augmentor is an image augmentation library in Python for machine learning. It aims to be a standalone library that is platform and framework independent, which is more convenient, allows for finer grained control over augmentation, and implements the most real-world relevant augmentation techniques. It employs a stochastic approach using building blocks that allow for operations to be pieced together in a pipeline.

@@ -20,8 +20,7 @@ wish to extend Augmentor or wish to see how operations function internally.
 
 For detailed information on extending Augmentor, see :ref:`extendingaugmentor`.
 """
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
+from __future__ import absolute_import, division, print_function, unicode_literals
 from builtins import *
 
 from PIL import Image, ImageOps, ImageEnhance
@@ -29,6 +28,7 @@ import math
 from math import floor, ceil
 
 import numpy as np
+
 # from skimage import img_as_ubyte
 # from skimage import transform
 
@@ -51,7 +51,8 @@ class Operation(object):
     the section on extending Augmentor with custom operations at
     :ref:`extendingaugmentor`.
     """
-    def __init__(self, probability):
+
+    def __init__(self, probability, skip_gt_image):
         """
         All operations must at least have a :attr:`probability` which is
         initialised when creating the operation's object.
@@ -61,6 +62,7 @@ class Operation(object):
         :type probability: Float
         """
         self.probability = probability
+        self.skip_gt_image = skip_gt_image  # check if need to skip operation once
 
     def __str__(self):
         """
@@ -93,7 +95,8 @@ class HistogramEqualisation(Operation):
     The class :class:`HistogramEqualisation` is used to perform histogram
     equalisation on images passed to its :func:`perform_operation` function.
     """
-    def __init__(self, probability):
+
+    def __init__(self, probability, skip_gt_image):
         """
         As there are no further user definable parameters, the class is
         instantiated using only the :attr:`probability` argument.
@@ -102,7 +105,7 @@ class HistogramEqualisation(Operation):
          performed when it is invoked in the pipeline.
         :type probability: Float
         """
-        Operation.__init__(self, probability)
+        Operation.__init__(self, probability, skip_gt_image)
 
     def perform_operation(self, images):
         """
@@ -140,7 +143,8 @@ class Greyscale(Operation):
 
     .. seealso:: The :class:`BlackAndWhite` class.
     """
-    def __init__(self, probability):
+
+    def __init__(self, probability, skip_gt_image):
         """
         As there are no further user definable parameters, the class is
         instantiated using only the :attr:`probability` argument.
@@ -149,7 +153,7 @@ class Greyscale(Operation):
          performed when it is invoked in the pipeline.
         :type probability: Float
         """
-        Operation.__init__(self, probability)
+        Operation.__init__(self, probability, skip_gt_image)
 
     def perform_operation(self, images):
         """
@@ -178,7 +182,8 @@ class Invert(Operation):
     This class is used to negate images. That is to reverse the pixel values
     for any image processed by it.
     """
-    def __init__(self, probability):
+
+    def __init__(self, probability, skip_gt_image):
         """
         As there are no further user definable parameters, the class is
         instantiated using only the :attr:`probability` argument.
@@ -187,7 +192,7 @@ class Invert(Operation):
          performed when it is invoked in the pipeline.
         :type probability: Float
         """
-        Operation.__init__(self, probability)
+        Operation.__init__(self, probability, skip_gt_image)
 
     def perform_operation(self, images):
         """
@@ -220,7 +225,8 @@ class BlackAndWhite(Operation):
 
     .. seealso:: The :class:`Greyscale` class.
     """
-    def __init__(self, probability, threshold):
+
+    def __init__(self, probability, skip_gt_image, threshold):
         """
         As well as the required :attr:`probability` parameter, a
         :attr:`threshold` can also be defined to define the cutoff point where
@@ -235,7 +241,7 @@ class BlackAndWhite(Operation):
         :type probability: Float
         :type threshold: Integer
         """
-        Operation.__init__(self, probability)
+        Operation.__init__(self, probability, skip_gt_image)
         self.threshold = threshold
 
     def perform_operation(self, images):
@@ -270,7 +276,8 @@ class RandomBrightness(Operation):
     """
     This class is used to random change image brightness.
     """
-    def __init__(self, probability, min_factor, max_factor):
+
+    def __init__(self, probability, skip_gt_image, min_factor, max_factor):
         """
         required :attr:`probability` parameter
 
@@ -289,7 +296,7 @@ class RandomBrightness(Operation):
         :type max_factor: Float
         :type max_factor: Float
         """
-        Operation.__init__(self, probability)
+        Operation.__init__(self, probability, skip_gt_image)
         self.min_factor = min_factor
         self.max_factor = max_factor
 
@@ -321,7 +328,8 @@ class RandomColor(Operation):
     """
     This class is used to random change saturation of an image.
     """
-    def __init__(self, probability, min_factor, max_factor):
+
+    def __init__(self, probability, skip_gt_image, min_factor, max_factor):
         """
         required :attr:`probability` parameter
 
@@ -340,7 +348,7 @@ class RandomColor(Operation):
         :type max_factor: Float
         :type max_factor: Float
         """
-        Operation.__init__(self, probability)
+        Operation.__init__(self, probability, skip_gt_image)
         self.min_factor = min_factor
         self.max_factor = max_factor
 
@@ -372,7 +380,8 @@ class RandomContrast(Operation):
     """
     This class is used to random change contrast of an image.
     """
-    def __init__(self, probability, min_factor,max_factor):
+
+    def __init__(self, probability, skip_gt_image, min_factor, max_factor):
         """
         required :attr:`probability` parameter
 
@@ -391,7 +400,7 @@ class RandomContrast(Operation):
         :type max_factor: Float
         :type max_factor: Float
         """
-        Operation.__init__(self, probability)
+        Operation.__init__(self, probability, skip_gt_image)
         self.min_factor = min_factor
         self.max_factor = max_factor
 
@@ -424,7 +433,8 @@ class Skew(Operation):
     This class is used to perform perspective skewing on images. It allows
     for skewing from a total of 12 different perspectives.
     """
-    def __init__(self, probability, skew_type, magnitude):
+
+    def __init__(self, probability, skip_gt_image, skew_type, magnitude):
         """
         As well as the required :attr:`probability` parameter, the type of
         skew that is performed is controlled using a :attr:`skew_type` and a
@@ -464,7 +474,7 @@ class Skew(Operation):
         :type skew_type: String
         :type magnitude: Integer
         """
-        Operation.__init__(self, probability)
+        Operation.__init__(self, probability, skip_gt_image)
         self.skew_type = skew_type
         self.magnitude = magnitude
 
@@ -531,28 +541,36 @@ class Skew(Operation):
 
             if skew_direction == 0:
                 # Left Tilt
-                new_plane = [(y1, x1 - skew_amount),  # Top Left
-                             (y2, x1),                # Top Right
-                             (y2, x2),                # Bottom Right
-                             (y1, x2 + skew_amount)]  # Bottom Left
+                new_plane = [
+                    (y1, x1 - skew_amount),  # Top Left
+                    (y2, x1),  # Top Right
+                    (y2, x2),  # Bottom Right
+                    (y1, x2 + skew_amount),
+                ]  # Bottom Left
             elif skew_direction == 1:
                 # Right Tilt
-                new_plane = [(y1, x1),                # Top Left
-                             (y2, x1 - skew_amount),  # Top Right
-                             (y2, x2 + skew_amount),  # Bottom Right
-                             (y1, x2)]                # Bottom Left
+                new_plane = [
+                    (y1, x1),  # Top Left
+                    (y2, x1 - skew_amount),  # Top Right
+                    (y2, x2 + skew_amount),  # Bottom Right
+                    (y1, x2),
+                ]  # Bottom Left
             elif skew_direction == 2:
                 # Forward Tilt
-                new_plane = [(y1 - skew_amount, x1),  # Top Left
-                             (y2 + skew_amount, x1),  # Top Right
-                             (y2, x2),                # Bottom Right
-                             (y1, x2)]                # Bottom Left
+                new_plane = [
+                    (y1 - skew_amount, x1),  # Top Left
+                    (y2 + skew_amount, x1),  # Top Right
+                    (y2, x2),  # Bottom Right
+                    (y1, x2),
+                ]  # Bottom Left
             elif skew_direction == 3:
                 # Backward Tilt
-                new_plane = [(y1, x1),                # Top Left
-                             (y2, x1),                # Top Right
-                             (y2 + skew_amount, x2),  # Bottom Right
-                             (y1 - skew_amount, x2)]  # Bottom Left
+                new_plane = [
+                    (y1, x1),  # Top Left
+                    (y2, x1),  # Top Right
+                    (y2 + skew_amount, x2),  # Bottom Right
+                    (y1 - skew_amount, x2),
+                ]  # Bottom Left
 
         if skew == "CORNER":
 
@@ -589,12 +607,29 @@ class Skew(Operation):
             # It may make sense to keep this, if we ensure the skew_amount below is randomised
             # and cannot be manually set by the user.
             corners = dict()
-            corners["top_left"] = (y1 - random.randint(1, skew_amount), x1 - random.randint(1, skew_amount))
-            corners["top_right"] = (y2 + random.randint(1, skew_amount), x1 - random.randint(1, skew_amount))
-            corners["bottom_right"] = (y2 + random.randint(1, skew_amount), x2 + random.randint(1, skew_amount))
-            corners["bottom_left"] = (y1 - random.randint(1, skew_amount), x2 + random.randint(1, skew_amount))
+            corners["top_left"] = (
+                y1 - random.randint(1, skew_amount),
+                x1 - random.randint(1, skew_amount),
+            )
+            corners["top_right"] = (
+                y2 + random.randint(1, skew_amount),
+                x1 - random.randint(1, skew_amount),
+            )
+            corners["bottom_right"] = (
+                y2 + random.randint(1, skew_amount),
+                x2 + random.randint(1, skew_amount),
+            )
+            corners["bottom_left"] = (
+                y1 - random.randint(1, skew_amount),
+                x2 + random.randint(1, skew_amount),
+            )
 
-            new_plane = [corners["top_left"], corners["top_right"], corners["bottom_right"], corners["bottom_left"]]
+            new_plane = [
+                corners["top_left"],
+                corners["top_right"],
+                corners["bottom_right"],
+                corners["bottom_left"],
+            ]
 
         # To calculate the coefficients required by PIL for the perspective skew,
         # see the following Stack Overflow discussion: https://goo.gl/sSgJdj
@@ -608,13 +643,17 @@ class Skew(Operation):
         B = np.array(original_plane).reshape(8)
 
         perspective_skew_coefficients_matrix = np.dot(np.linalg.pinv(A), B)
-        perspective_skew_coefficients_matrix = np.array(perspective_skew_coefficients_matrix).reshape(8)
+        perspective_skew_coefficients_matrix = np.array(
+            perspective_skew_coefficients_matrix
+        ).reshape(8)
 
         def do(image):
-            return image.transform(image.size,
-                                   Image.PERSPECTIVE,
-                                   perspective_skew_coefficients_matrix,
-                                   resample=Image.BICUBIC)
+            return image.transform(
+                image.size,
+                Image.PERSPECTIVE,
+                perspective_skew_coefficients_matrix,
+                resample=Image.BICUBIC,
+            )
 
         augmented_images = []
 
@@ -634,12 +673,20 @@ class RotateStandard(Operation):
     .. seealso:: For 90 degree rotations, see the :class:`Rotate` class.
     """
 
-    def __init__(self, probability, max_left_rotation, max_right_rotation, expand=False, fillcolor=None):
+    def __init__(
+        self,
+        probability,
+        skip_gt_image,
+        max_left_rotation,
+        max_right_rotation,
+        expand=False,
+        fillcolor=None,
+    ):
         """
         Documentation to appear.
         """
-        Operation.__init__(self, probability)
-        self.max_left_rotation = -abs(max_left_rotation)   # Ensure always negative
+        Operation.__init__(self, probability, skip_gt_image)
+        self.max_left_rotation = -abs(max_left_rotation)  # Ensure always negative
         self.max_right_rotation = abs(max_right_rotation)  # Ensure always positive
         self.expand = expand
         self.fillcolor = fillcolor
@@ -666,7 +713,9 @@ class RotateStandard(Operation):
             rotation = random_right
 
         def do(image):
-            return image.rotate(rotation, expand=self.expand, resample=Image.BICUBIC, fillcolor=self.fillcolor)
+            return image.rotate(
+                rotation, expand=self.expand, resample=Image.BICUBIC, fillcolor=self.fillcolor
+            )
 
         augmented_images = []
 
@@ -683,7 +732,7 @@ class Rotate(Operation):
     class.
     """
 
-    def __init__(self, probability, rotation):
+    def __init__(self, probability, skip_gt_image, rotation):
         """
         As well as the required :attr:`probability` parameter, the
         :attr:`rotation` parameter controls the rotation to perform,
@@ -702,7 +751,7 @@ class Rotate(Operation):
         .. seealso:: For arbitrary rotations, see the :class:`RotateRange` class.
 
         """
-        Operation.__init__(self, probability)
+        Operation.__init__(self, probability, skip_gt_image)
         self.rotation = rotation
 
     def __str__(self):
@@ -758,7 +807,8 @@ class RotateRange(Operation):
     The :ref:`rotating` section describes this in detail and has example
     images to demonstrate this.
     """
-    def __init__(self, probability, max_left_rotation, max_right_rotation):
+
+    def __init__(self, probability, skip_gt_image, max_left_rotation, max_right_rotation):
         """
         As well as the required :attr:`probability` parameter, the
         :attr:`max_left_rotation` parameter controls the maximum number of
@@ -776,8 +826,8 @@ class RotateRange(Operation):
         :type max_left_rotation: Integer
         :type max_right_rotation: Integer
         """
-        Operation.__init__(self, probability)
-        self.max_left_rotation = -abs(max_left_rotation)   # Ensure always negative
+        Operation.__init__(self, probability, skip_gt_image)
+        self.max_left_rotation = -abs(max_left_rotation)  # Ensure always negative
         self.max_right_rotation = abs(max_right_rotation)  # Ensure always positive
 
     def perform_operation(self, images):
@@ -832,8 +882,11 @@ class RotateRange(Operation):
             angle_b_sin = math.sin(angle_b_rad)
 
             # Find the maximum area of the rectangle that could be cropped
-            E = (math.sin(angle_a_rad)) / (math.sin(angle_b_rad)) * \
-                (Y - X * (math.sin(angle_a_rad) / math.sin(angle_b_rad)))
+            E = (
+                (math.sin(angle_a_rad))
+                / (math.sin(angle_b_rad))
+                * (Y - X * (math.sin(angle_a_rad) / math.sin(angle_b_rad)))
+            )
             E = E / 1 - (math.sin(angle_a_rad) ** 2 / math.sin(angle_b_rad) ** 2)
             B = X - E
             A = (math.sin(angle_a_rad) / math.sin(angle_b_rad)) * B
@@ -857,7 +910,8 @@ class Resize(Operation):
     """
     This class is used to resize images by absolute values passed as parameters.
     """
-    def __init__(self, probability, width, height, resample_filter):
+
+    def __init__(self, probability, skip_gt_image, width, height, resample_filter):
         """
         Accepts the required probability parameter as well as parameters
         to control the size of the transformed image.
@@ -874,7 +928,7 @@ class Resize(Operation):
         :type height: Integer
         :type resample_filter: String
         """
-        Operation.__init__(self, probability)
+        Operation.__init__(self, probability, skip_gt_image)
         self.width = width
         self.height = height
         self.resample_filter = resample_filter
@@ -909,7 +963,8 @@ class Flip(Operation):
     The class allows an image to be mirrored along either
     its x axis or its y axis, or randomly.
     """
-    def __init__(self, probability, top_bottom_left_right):
+
+    def __init__(self, probability, skip_gt_image, top_bottom_left_right):
         """
         The direction of the flip, or whether it should be randomised, is
         controlled using the :attr:`top_bottom_left_right` parameter.
@@ -925,7 +980,7 @@ class Flip(Operation):
          - ``RANDOM`` defines that the image is mirrored randomly along
            either the x or y axis.
         """
-        Operation.__init__(self, probability)
+        Operation.__init__(self, probability, skip_gt_image)
         self.top_bottom_left_right = top_bottom_left_right
 
     def perform_operation(self, images):
@@ -964,7 +1019,8 @@ class Crop(Operation):
     """
     This class is used to crop images by absolute values passed as parameters.
     """
-    def __init__(self, probability, width, height, centre):
+
+    def __init__(self, probability, skip_gt_image, width, height, centre):
         """
         As well as the always required :attr:`probability` parameter, the
         constructor requires a :attr:`width` to control the width of
@@ -985,7 +1041,7 @@ class Crop(Operation):
         :type height: Integer
         :type centre: Boolean
         """
-        Operation.__init__(self, probability)
+        Operation.__init__(self, probability, skip_gt_image, skip_gt_image)
         self.width = width
         self.height = height
         self.centre = centre
@@ -1001,7 +1057,9 @@ class Crop(Operation):
          PIL.Image.
         """
 
-        w, h = images[0].size  # All images must be the same size, so we can just check the first image in the list
+        w, h = images[
+            0
+        ].size  # All images must be the same size, so we can just check the first image in the list
 
         left_shift = random.randint(0, int((w - self.width)))
         down_shift = random.randint(0, int((h - self.height)))
@@ -1013,9 +1071,18 @@ class Crop(Operation):
                 return image
 
             if self.centre:
-                return image.crop(((w/2)-(self.width/2), (h/2)-(self.height/2), (w/2)+(self.width/2), (h/2)+(self.height/2)))
+                return image.crop(
+                    (
+                        (w / 2) - (self.width / 2),
+                        (h / 2) - (self.height / 2),
+                        (w / 2) + (self.width / 2),
+                        (h / 2) + (self.height / 2),
+                    )
+                )
             else:
-                return image.crop((left_shift, down_shift, self.width + left_shift, self.height + down_shift))
+                return image.crop(
+                    (left_shift, down_shift, self.width + left_shift, self.height + down_shift)
+                )
 
         augmented_images = []
 
@@ -1029,7 +1096,10 @@ class CropPercentage(Operation):
     """
     This class is used to crop images by a percentage of their area.
     """
-    def __init__(self, probability, percentage_area, centre, randomise_percentage_area):
+
+    def __init__(
+        self, probability, skip_gt_image, percentage_area, centre, randomise_percentage_area
+    ):
         """
         As well as the always required :attr:`probability` parameter, the
         constructor requires a :attr:`percentage_area` to control the area
@@ -1048,7 +1118,7 @@ class CropPercentage(Operation):
         :type percentage_area: Float
         :type centre: Boolean
         """
-        Operation.__init__(self, probability)
+        Operation.__init__(self, probability, skip_gt_image)
         self.percentage_area = percentage_area
         self.centre = centre
         self.randomise_percentage_area = randomise_percentage_area
@@ -1072,7 +1142,9 @@ class CropPercentage(Operation):
         # The images must be of identical size, which is checked by Pipeline.ground_truth().
         w, h = images[0].size
 
-        w_new = int(floor(w * r_percentage_area))  # TODO: Floor might return 0, so we need to check this.
+        w_new = int(
+            floor(w * r_percentage_area)
+        )  # TODO: Floor might return 0, so we need to check this.
         h_new = int(floor(h * r_percentage_area))
 
         left_shift = random.randint(0, int((w - w_new)))
@@ -1080,7 +1152,14 @@ class CropPercentage(Operation):
 
         def do(image):
             if self.centre:
-                return image.crop(((w/2)-(w_new/2), (h/2)-(h_new/2), (w/2)+(w_new/2), (h/2)+(h_new/2)))
+                return image.crop(
+                    (
+                        (w / 2) - (w_new / 2),
+                        (h / 2) - (h_new / 2),
+                        (w / 2) + (w_new / 2),
+                        (h / 2) + (h_new / 2),
+                    )
+                )
             else:
                 return image.crop((left_shift, down_shift, w_new + left_shift, h_new + down_shift))
 
@@ -1098,7 +1177,8 @@ class CropRandom(Operation):
      of the user-facing functions in the :class:`~Augmentor.Pipeline.Pipeline`
      class.
     """
-    def __init__(self, probability, percentage_area):
+
+    def __init__(self, probability, skip_gt_image, percentage_area):
         """
         :param probability: Controls the probability that the operation is
          performed when it is invoked in the pipeline.
@@ -1106,7 +1186,7 @@ class CropRandom(Operation):
          to crop. A value of 0.5 would crop an area that is 50% of the area
          of the original image's size.
         """
-        Operation.__init__(self, probability)
+        Operation.__init__(self, probability, skip_gt_image)
         self.percentage_area = percentage_area
 
     def perform_operation(self, images):
@@ -1124,11 +1204,20 @@ class CropRandom(Operation):
         w_new = int(floor(w * self.percentage_area))
         h_new = int(floor(h * self.percentage_area))
 
-        random_left_shift = random.randint(0, int((w - w_new)))  # Note: randint() is from uniform distribution.
+        random_left_shift = random.randint(
+            0, int((w - w_new))
+        )  # Note: randint() is from uniform distribution.
         random_down_shift = random.randint(0, int((h - h_new)))
 
         def do(image):
-            return image.crop((random_left_shift, random_down_shift, w_new + random_left_shift, h_new + random_down_shift))
+            return image.crop(
+                (
+                    random_left_shift,
+                    random_down_shift,
+                    w_new + random_left_shift,
+                    h_new + random_down_shift,
+                )
+            )
 
         augmented_images = []
 
@@ -1154,7 +1243,8 @@ class Shear(Operation):
 
     For sample code with image examples see :ref:`shearing`.
     """
-    def __init__(self, probability, max_shear_left, max_shear_right):
+
+    def __init__(self, probability, skip_gt_image, max_shear_left, max_shear_right):
         """
         The shearing is randomised in magnitude, from 0 to the
         :attr:`max_shear_left` or 0 to :attr:`max_shear_right` where the
@@ -1170,7 +1260,7 @@ class Shear(Operation):
         :type max_shear_left: Integer
         :type max_shear_right: Integer
         """
-        Operation.__init__(self, probability)
+        Operation.__init__(self, probability, skip_gt_image)
         self.max_shear_left = max_shear_left
         self.max_shear_right = max_shear_right
 
@@ -1207,8 +1297,11 @@ class Shear(Operation):
         # max_shear_left = 20
         # max_shear_right = 20
 
-        angle_to_shear = int(random.uniform((abs(self.max_shear_left)*-1) - 1, self.max_shear_right + 1))
-        if angle_to_shear != -1: angle_to_shear += 1
+        angle_to_shear = int(
+            random.uniform((abs(self.max_shear_left) * -1) - 1, self.max_shear_right + 1)
+        )
+        if angle_to_shear != -1:
+            angle_to_shear += 1
 
         # Alternative method
         # Calculate our offset when cropping
@@ -1258,13 +1351,14 @@ class Shear(Operation):
                     phi = abs(phi) * -1
 
                 # Note: PIL expects the inverse scale, so 1/scale_factor for example.
-                transform_matrix = (1, phi, -matrix_offset,
-                                    0, 1, 0)
+                transform_matrix = (1, phi, -matrix_offset, 0, 1, 0)
 
-                image = image.transform((int(round(width + shift_in_pixels)), height),
-                                        Image.AFFINE,
-                                        transform_matrix,
-                                        Image.BICUBIC)
+                image = image.transform(
+                    (int(round(width + shift_in_pixels)), height),
+                    Image.AFFINE,
+                    transform_matrix,
+                    Image.BICUBIC,
+                )
 
                 image = image.crop((abs(shift_in_pixels), 0, width, height))
 
@@ -1279,13 +1373,14 @@ class Shear(Operation):
                     matrix_offset = 0
                     phi = abs(phi) * -1
 
-                transform_matrix = (1, 0, 0,
-                                    phi, 1, -matrix_offset)
+                transform_matrix = (1, 0, 0, phi, 1, -matrix_offset)
 
-                image = image.transform((width, int(round(height + shift_in_pixels))),
-                                        Image.AFFINE,
-                                        transform_matrix,
-                                        Image.BICUBIC)
+                image = image.transform(
+                    (width, int(round(height + shift_in_pixels))),
+                    Image.AFFINE,
+                    transform_matrix,
+                    Image.BICUBIC,
+                )
 
                 image = image.crop((0, abs(shift_in_pixels), width, height))
 
@@ -1310,7 +1405,8 @@ class Scale(Operation):
     This function will return images that are **larger** than the input
     images.
     """
-    def __init__(self, probability, scale_factor):
+
+    def __init__(self, probability, skip_gt_image, scale_factor):
         """
         As the aspect ratio is always kept constant, only a
         :attr:`scale_factor` is required for scaling the image.
@@ -1322,7 +1418,7 @@ class Scale(Operation):
         :type probability: Float
         :type scale_factor: Float
         """
-        Operation.__init__(self, probability)
+        Operation.__init__(self, probability, skip_gt_image)
         self.scale_factor = scale_factor
 
     def perform_operation(self, images):
@@ -1356,7 +1452,8 @@ class Distort(Operation):
     """
     This class performs randomised, elastic distortions on images.
     """
-    def __init__(self, probability, grid_width, grid_height, magnitude):
+
+    def __init__(self, probability, skip_gt_image, grid_width, grid_height, magnitude):
         """
         As well as the probability, the granularity of the distortions
         produced by this class can be controlled using the width and
@@ -1379,7 +1476,7 @@ class Distort(Operation):
         :type grid_height: Integer
         :type magnitude: Integer
         """
-        Operation.__init__(self, probability)
+        Operation.__init__(self, probability, skip_gt_image)
         self.grid_width = grid_width
         self.grid_height = grid_height
         self.magnitude = abs(magnitude)
@@ -1412,26 +1509,44 @@ class Distort(Operation):
 
         for vertical_tile in range(vertical_tiles):
             for horizontal_tile in range(horizontal_tiles):
-                if vertical_tile == (vertical_tiles - 1) and horizontal_tile == (horizontal_tiles - 1):
-                    dimensions.append([horizontal_tile * width_of_square,
-                                       vertical_tile * height_of_square,
-                                       width_of_last_square + (horizontal_tile * width_of_square),
-                                       height_of_last_square + (height_of_square * vertical_tile)])
+                if vertical_tile == (vertical_tiles - 1) and horizontal_tile == (
+                    horizontal_tiles - 1
+                ):
+                    dimensions.append(
+                        [
+                            horizontal_tile * width_of_square,
+                            vertical_tile * height_of_square,
+                            width_of_last_square + (horizontal_tile * width_of_square),
+                            height_of_last_square + (height_of_square * vertical_tile),
+                        ]
+                    )
                 elif vertical_tile == (vertical_tiles - 1):
-                    dimensions.append([horizontal_tile * width_of_square,
-                                       vertical_tile * height_of_square,
-                                       width_of_square + (horizontal_tile * width_of_square),
-                                       height_of_last_square + (height_of_square * vertical_tile)])
+                    dimensions.append(
+                        [
+                            horizontal_tile * width_of_square,
+                            vertical_tile * height_of_square,
+                            width_of_square + (horizontal_tile * width_of_square),
+                            height_of_last_square + (height_of_square * vertical_tile),
+                        ]
+                    )
                 elif horizontal_tile == (horizontal_tiles - 1):
-                    dimensions.append([horizontal_tile * width_of_square,
-                                       vertical_tile * height_of_square,
-                                       width_of_last_square + (horizontal_tile * width_of_square),
-                                       height_of_square + (height_of_square * vertical_tile)])
+                    dimensions.append(
+                        [
+                            horizontal_tile * width_of_square,
+                            vertical_tile * height_of_square,
+                            width_of_last_square + (horizontal_tile * width_of_square),
+                            height_of_square + (height_of_square * vertical_tile),
+                        ]
+                    )
                 else:
-                    dimensions.append([horizontal_tile * width_of_square,
-                                       vertical_tile * height_of_square,
-                                       width_of_square + (horizontal_tile * width_of_square),
-                                       height_of_square + (height_of_square * vertical_tile)])
+                    dimensions.append(
+                        [
+                            horizontal_tile * width_of_square,
+                            vertical_tile * height_of_square,
+                            width_of_square + (horizontal_tile * width_of_square),
+                            height_of_square + (height_of_square * vertical_tile),
+                        ]
+                    )
 
         # For loop that generates polygons could be rewritten, but maybe harder to read?
         # polygons = [x1,y1, x1,y2, x2,y2, x2,y1 for x1,y1, x2,y2 in dimensions]
@@ -1439,9 +1554,12 @@ class Distort(Operation):
         # last_column = [(horizontal_tiles - 1) + horizontal_tiles * i for i in range(vertical_tiles)]
         last_column = []
         for i in range(vertical_tiles):
-            last_column.append((horizontal_tiles-1)+horizontal_tiles*i)
+            last_column.append((horizontal_tiles - 1) + horizontal_tiles * i)
 
-        last_row = range((horizontal_tiles * vertical_tiles) - horizontal_tiles, horizontal_tiles * vertical_tiles)
+        last_row = range(
+            (horizontal_tiles * vertical_tiles) - horizontal_tiles,
+            horizontal_tiles * vertical_tiles,
+        )
 
         polygons = []
         for x1, y1, x2, y2 in dimensions:
@@ -1457,28 +1575,16 @@ class Distort(Operation):
             dy = random.randint(-self.magnitude, self.magnitude)
 
             x1, y1, x2, y2, x3, y3, x4, y4 = polygons[a]
-            polygons[a] = [x1, y1,
-                            x2, y2,
-                            x3 + dx, y3 + dy,
-                            x4, y4]
+            polygons[a] = [x1, y1, x2, y2, x3 + dx, y3 + dy, x4, y4]
 
             x1, y1, x2, y2, x3, y3, x4, y4 = polygons[b]
-            polygons[b] = [x1, y1,
-                            x2 + dx, y2 + dy,
-                            x3, y3,
-                            x4, y4]
+            polygons[b] = [x1, y1, x2 + dx, y2 + dy, x3, y3, x4, y4]
 
             x1, y1, x2, y2, x3, y3, x4, y4 = polygons[c]
-            polygons[c] = [x1, y1,
-                            x2, y2,
-                            x3, y3,
-                            x4 + dx, y4 + dy]
+            polygons[c] = [x1, y1, x2, y2, x3, y3, x4 + dx, y4 + dy]
 
             x1, y1, x2, y2, x3, y3, x4, y4 = polygons[d]
-            polygons[d] = [x1 + dx, y1 + dy,
-                            x2, y2,
-                            x3, y3,
-                            x4, y4]
+            polygons[d] = [x1 + dx, y1 + dy, x2, y2, x3, y3, x4, y4]
 
         generated_mesh = []
         for i in range(len(dimensions)):
@@ -1500,7 +1606,21 @@ class GaussianDistortion(Operation):
     """
     This class performs randomised, elastic gaussian distortions on images.
     """
-    def __init__(self, probability, grid_width, grid_height, magnitude, corner, method, mex, mey, sdx, sdy):
+
+    def __init__(
+        self,
+        probability,
+        skip_gt_image,
+        grid_width,
+        grid_height,
+        magnitude,
+        corner,
+        method,
+        mex,
+        mey,
+        sdx,
+        sdy,
+    ):
         """
         As well as the probability, the granularity of the distortions
         produced by this class can be controlled using the width and
@@ -1549,7 +1669,7 @@ class GaussianDistortion(Operation):
 
          e^{- \Big( \\frac{(x-\\text{mex})^2}{\\text{sdx}} + \\frac{(y-\\text{mey})^2}{\\text{sdy}} \Big) }
         """
-        Operation.__init__(self, probability)
+        Operation.__init__(self, probability, skip_gt_image)
         self.grid_width = grid_width
         self.grid_height = grid_height
         self.magnitude = abs(magnitude)
@@ -1586,32 +1706,53 @@ class GaussianDistortion(Operation):
 
         for vertical_tile in range(vertical_tiles):
             for horizontal_tile in range(horizontal_tiles):
-                if vertical_tile == (vertical_tiles - 1) and horizontal_tile == (horizontal_tiles - 1):
-                    dimensions.append([horizontal_tile * width_of_square,
-                                       vertical_tile * height_of_square,
-                                       width_of_last_square + (horizontal_tile * width_of_square),
-                                       height_of_last_square + (height_of_square * vertical_tile)])
+                if vertical_tile == (vertical_tiles - 1) and horizontal_tile == (
+                    horizontal_tiles - 1
+                ):
+                    dimensions.append(
+                        [
+                            horizontal_tile * width_of_square,
+                            vertical_tile * height_of_square,
+                            width_of_last_square + (horizontal_tile * width_of_square),
+                            height_of_last_square + (height_of_square * vertical_tile),
+                        ]
+                    )
                 elif vertical_tile == (vertical_tiles - 1):
-                    dimensions.append([horizontal_tile * width_of_square,
-                                       vertical_tile * height_of_square,
-                                       width_of_square + (horizontal_tile * width_of_square),
-                                       height_of_last_square + (height_of_square * vertical_tile)])
+                    dimensions.append(
+                        [
+                            horizontal_tile * width_of_square,
+                            vertical_tile * height_of_square,
+                            width_of_square + (horizontal_tile * width_of_square),
+                            height_of_last_square + (height_of_square * vertical_tile),
+                        ]
+                    )
                 elif horizontal_tile == (horizontal_tiles - 1):
-                    dimensions.append([horizontal_tile * width_of_square,
-                                       vertical_tile * height_of_square,
-                                       width_of_last_square + (horizontal_tile * width_of_square),
-                                       height_of_square + (height_of_square * vertical_tile)])
+                    dimensions.append(
+                        [
+                            horizontal_tile * width_of_square,
+                            vertical_tile * height_of_square,
+                            width_of_last_square + (horizontal_tile * width_of_square),
+                            height_of_square + (height_of_square * vertical_tile),
+                        ]
+                    )
                 else:
-                    dimensions.append([horizontal_tile * width_of_square,
-                                       vertical_tile * height_of_square,
-                                       width_of_square + (horizontal_tile * width_of_square),
-                                       height_of_square + (height_of_square * vertical_tile)])
+                    dimensions.append(
+                        [
+                            horizontal_tile * width_of_square,
+                            vertical_tile * height_of_square,
+                            width_of_square + (horizontal_tile * width_of_square),
+                            height_of_square + (height_of_square * vertical_tile),
+                        ]
+                    )
 
         last_column = []
         for i in range(vertical_tiles):
-            last_column.append((horizontal_tiles-1)+horizontal_tiles*i)
+            last_column.append((horizontal_tiles - 1) + horizontal_tiles * i)
 
-        last_row = range((horizontal_tiles * vertical_tiles) - horizontal_tiles, horizontal_tiles * vertical_tiles)
+        last_row = range(
+            (horizontal_tiles * vertical_tiles) - horizontal_tiles,
+            horizontal_tiles * vertical_tiles,
+        )
 
         polygons = []
         for x1, y1, x2, y2 in dimensions:
@@ -1623,8 +1764,12 @@ class GaussianDistortion(Operation):
                 polygon_indices.append([i, i + 1, i + horizontal_tiles, i + 1 + horizontal_tiles])
 
         def sigmoidf(x, y, sdx=0.05, sdy=0.05, mex=0.5, mey=0.5, const=1):
-            sigmoid = lambda x1, y1:  (const * (math.exp(-(((x1-mex)**2)/sdx + ((y1-mey)**2)/sdy) )) + max(0,-const) - max(0, const))
-            xl = np.linspace(0,1)
+            sigmoid = lambda x1, y1: (
+                const * (math.exp(-(((x1 - mex) ** 2) / sdx + ((y1 - mey) ** 2) / sdy)))
+                + max(0, -const)
+                - max(0, const)
+            )
+            xl = np.linspace(0, 1)
             yl = np.linspace(0, 1)
             X, Y = np.meshgrid(xl, yl)
 
@@ -1632,11 +1777,17 @@ class GaussianDistortion(Operation):
             mino = np.amin(Z)
             maxo = np.amax(Z)
             res = sigmoid(x, y)
-            res = max(((((res - mino) * (1 - 0)) / (maxo - mino)) + 0), 0.01)*self.magnitude
+            res = max(((((res - mino) * (1 - 0)) / (maxo - mino)) + 0), 0.01) * self.magnitude
             return res
 
         def corner(x, y, corner="ul", method="out", sdx=0.05, sdy=0.05, mex=0.5, mey=0.5):
-            ll = {'dr': (0, 0.5, 0, 0.5), 'dl': (0.5, 1, 0, 0.5), 'ur': (0, 0.5, 0.5, 1), 'ul': (0.5, 1, 0.5, 1), 'bell': (0, 1, 0, 1)}
+            ll = {
+                'dr': (0, 0.5, 0, 0.5),
+                'dl': (0.5, 1, 0, 0.5),
+                'ur': (0, 0.5, 0.5, 1),
+                'ul': (0.5, 1, 0.5, 1),
+                'bell': (0, 1, 0, 1),
+            }
             new_c = ll[corner]
             new_x = (((x - 0) * (new_c[1] - new_c[0])) / (1 - 0)) + new_c[0]
             new_y = (((y - 0) * (new_c[3] - new_c[2])) / (1 - 0)) + new_c[2]
@@ -1644,10 +1795,10 @@ class GaussianDistortion(Operation):
                 const = 1
             else:
                 if method == "out":
-                    const =- 1
+                    const = -1
                 else:
                     const = 1
-            res = sigmoidf(x=new_x, y=new_y,sdx=sdx, sdy=sdy, mex=mex, mey=mey, const=const)
+            res = sigmoidf(x=new_x, y=new_y, sdx=sdx, sdy=sdy, mex=mex, mey=mey, const=const)
 
             return res
 
@@ -1656,31 +1807,28 @@ class GaussianDistortion(Operation):
             for a, b, c, d in polygon_indices:
                 x1, y1, x2, y2, x3, y3, x4, y4 = polygons[a]
 
-                sigmax = corner(x=x3/w, y=y3/h, corner=self.corner, method=self.method, sdx=self.sdx, sdy=self.sdy, mex=self.mex, mey=self.mey)
+                sigmax = corner(
+                    x=x3 / w,
+                    y=y3 / h,
+                    corner=self.corner,
+                    method=self.method,
+                    sdx=self.sdx,
+                    sdy=self.sdy,
+                    mex=self.mex,
+                    mey=self.mey,
+                )
                 dx = np.random.normal(0, sigmax, 1)[0]
                 dy = np.random.normal(0, sigmax, 1)[0]
-                polygons[a] = [x1, y1,
-                               x2, y2,
-                               x3 + dx, y3 + dy,
-                               x4, y4]
+                polygons[a] = [x1, y1, x2, y2, x3 + dx, y3 + dy, x4, y4]
 
                 x1, y1, x2, y2, x3, y3, x4, y4 = polygons[b]
-                polygons[b] = [x1, y1,
-                               x2 + dx, y2 + dy,
-                               x3, y3,
-                               x4, y4]
+                polygons[b] = [x1, y1, x2 + dx, y2 + dy, x3, y3, x4, y4]
 
                 x1, y1, x2, y2, x3, y3, x4, y4 = polygons[c]
-                polygons[c] = [x1, y1,
-                               x2, y2,
-                               x3, y3,
-                               x4 + dx, y4 + dy]
+                polygons[c] = [x1, y1, x2, y2, x3, y3, x4 + dx, y4 + dy]
 
                 x1, y1, x2, y2, x3, y3, x4, y4 = polygons[d]
-                polygons[d] = [x1 + dx, y1 + dy,
-                               x2, y2,
-                               x3, y3,
-                               x4, y4]
+                polygons[d] = [x1 + dx, y1 + dy, x2, y2, x3, y3, x4, y4]
 
             generated_mesh = []
             for i in range(len(dimensions)):
@@ -1701,7 +1849,8 @@ class Zoom(Operation):
     This class is used to enlarge images (to zoom) but to return a cropped
     region of the zoomed image of the same size as the original image.
     """
-    def __init__(self, probability, min_factor, max_factor):
+
+    def __init__(self, probability, skip_gt_image, min_factor, max_factor):
         """
         The amount of zoom applied is randomised, from between
         :attr:`min_factor` and :attr:`max_factor`. Set these both to the same
@@ -1719,7 +1868,7 @@ class Zoom(Operation):
         :type min_factor: Float
         :type max_factor: Float
         """
-        Operation.__init__(self, probability)
+        Operation.__init__(self, probability, skip_gt_image)
         self.min_factor = min_factor
         self.max_factor = max_factor
 
@@ -1737,15 +1886,20 @@ class Zoom(Operation):
         def do(image):
             w, h = image.size
 
-            image_zoomed = image.resize((int(round(image.size[0] * factor)),
-                                         int(round(image.size[1] * factor))),
-                                         resample=Image.BICUBIC)
+            image_zoomed = image.resize(
+                (int(round(image.size[0] * factor)), int(round(image.size[1] * factor))),
+                resample=Image.BICUBIC,
+            )
             w_zoomed, h_zoomed = image_zoomed.size
 
-            return image_zoomed.crop((floor((float(w_zoomed) / 2) - (float(w) / 2)),
-                                      floor((float(h_zoomed) / 2) - (float(h) / 2)),
-                                      floor((float(w_zoomed) / 2) + (float(w) / 2)),
-                                      floor((float(h_zoomed) / 2) + (float(h) / 2))))
+            return image_zoomed.crop(
+                (
+                    floor((float(w_zoomed) / 2) - (float(w) / 2)),
+                    floor((float(h_zoomed) / 2) - (float(h) / 2)),
+                    floor((float(w_zoomed) / 2) + (float(w) / 2)),
+                    floor((float(h_zoomed) / 2) + (float(h) / 2)),
+                )
+            )
 
         augmented_images = []
 
@@ -1760,7 +1914,7 @@ class ZoomRandom(Operation):
     This class is used to zoom into random areas of the image.
     """
 
-    def __init__(self, probability, percentage_area, randomise):
+    def __init__(self, probability, skip_gt_image, percentage_area, randomise):
         """
         Zooms into a random area of the image, rather than the centre of
         the image, as is done by :class:`Zoom`. The zoom factor is fixed
@@ -1776,7 +1930,7 @@ class ZoomRandom(Operation):
          upper bound, and randomises the zoom level from between 0.1 and
          :attr:`percentage_area`.
         """
-        Operation.__init__(self, probability)
+        Operation.__init__(self, probability, skip_gt_image)
         self.percentage_area = percentage_area
         self.randomise = randomise
 
@@ -1803,11 +1957,20 @@ class ZoomRandom(Operation):
         w_new = int(floor(w * r_percentage_area))
         h_new = int(floor(h * r_percentage_area))
 
-        random_left_shift = random.randint(0, (w - w_new))  # Note: randint() is from uniform distribution.
+        random_left_shift = random.randint(
+            0, (w - w_new)
+        )  # Note: randint() is from uniform distribution.
         random_down_shift = random.randint(0, (h - h_new))
 
         def do(image):
-            image = image.crop((random_left_shift, random_down_shift, w_new + random_left_shift, h_new + random_down_shift))
+            image = image.crop(
+                (
+                    random_left_shift,
+                    random_down_shift,
+                    w_new + random_left_shift,
+                    h_new + random_down_shift,
+                )
+            )
 
             return image.resize((w, h), resample=Image.BICUBIC)
 
@@ -1823,8 +1986,18 @@ class HSVShifting(Operation):
     """
     CURRENTLY NOT IMPLEMENTED.
     """
-    def __init__(self, probability, hue_shift, saturation_scale, saturation_shift, value_scale, value_shift):
-        Operation.__init__(self, probability)
+
+    def __init__(
+        self,
+        probability,
+        skip_gt_image,
+        hue_shift,
+        saturation_scale,
+        saturation_shift,
+        value_scale,
+        value_shift,
+    ):
+        Operation.__init__(self, probability, skip_gt_image)
         self.hue_shift = hue_shift
         self.saturation_scale = saturation_scale
         self.saturation_shift = saturation_shift
@@ -1832,19 +2005,20 @@ class HSVShifting(Operation):
         self.value_shift = value_shift
 
     def perform_operation(self, images):
-
         def do(image):
             hsv = np.array(image.convert("HSV"), 'float64')
-            hsv /= 255.
+            hsv /= 255.0
 
             hsv[..., 0] += np.random.uniform(-self.hue_shift, self.hue_shift)
-            hsv[..., 1] *= np.random.uniform(1 / (1 + self.saturation_scale), 1 + self.saturation_scale)
+            hsv[..., 1] *= np.random.uniform(
+                1 / (1 + self.saturation_scale), 1 + self.saturation_scale
+            )
             hsv[..., 1] += np.random.uniform(-self.saturation_shift, self.saturation_shift)
             hsv[..., 2] *= np.random.uniform(1 / (1 + self.value_scale), 1 + self.value_scale)
             hsv[..., 2] += np.random.uniform(-self.value_shift, self.value_shift)
 
             hsv.clip(0, 1, hsv)
-            hsv = np.uint8(np.round(hsv * 255.))
+            hsv = np.uint8(np.round(hsv * 255.0))
 
             return Image.fromarray(hsv, "HSV").convert("RGB")
 
@@ -1869,7 +2043,8 @@ class RandomErasing(Operation):
 
     Random Erasing can make a trained neural network more robust to occlusion.
     """
-    def __init__(self, probability, rectangle_area):
+
+    def __init__(self, probability, skip_gt_image, rectangle_area):
         """
         The size of the random rectangle is controlled using the
         :attr:`rectangle_area` parameter. This area is random in its
@@ -1879,7 +2054,7 @@ class RandomErasing(Operation):
          performed.
         :param rectangle_area: The percentage are of the image to occlude.
         """
-        Operation.__init__(self, probability)
+        Operation.__init__(self, probability, skip_gt_image)
         self.rectangle_area = rectangle_area
 
     def perform_operation(self, images):
@@ -1911,9 +2086,13 @@ class RandomErasing(Operation):
         def do(image):
 
             if len(image.getbands()) == 1:
-                rectangle = Image.fromarray(np.uint8(np.random.rand(w_occlusion, h_occlusion) * 255))
+                rectangle = Image.fromarray(
+                    np.uint8(np.random.rand(w_occlusion, h_occlusion) * 255)
+                )
             else:
-                rectangle = Image.fromarray(np.uint8(np.random.rand(w_occlusion, h_occlusion, len(image.getbands())) * 255))
+                rectangle = Image.fromarray(
+                    np.uint8(np.random.rand(w_occlusion, h_occlusion, len(image.getbands())) * 255)
+                )
 
             image.paste(rectangle, (random_position_x, random_position_y))
 
@@ -1932,7 +2111,8 @@ class Custom(Operation):
     Class that allows for a custom operation to be performed using Augmentor's
     standard :class:`~Augmentor.Pipeline.Pipeline` object.
     """
-    def __init__(self, probability, custom_function, **function_arguments):
+
+    def __init__(self, probability, skip_gt_image, custom_function, **function_arguments):
         """
         Creates a custom operation that can be added to a pipeline.
 
@@ -1954,7 +2134,7 @@ class Custom(Operation):
         :type custom_function: \*Function
         :type function_arguments: dict
         """
-        Operation.__init__(self, probability)
+        Operation.__init__(self, probability, skip_gt_image)
         self.custom_function = custom_function
         self.function_arguments = function_arguments
 
@@ -1978,7 +2158,8 @@ class ZoomGroundTruth(Operation):
     This class is used to enlarge images (to zoom) but to return a cropped
     region of the zoomed image of the same size as the original image.
     """
-    def __init__(self, probability, min_factor, max_factor):
+
+    def __init__(self, probability, skip_gt_image, min_factor, max_factor):
         """
         The amount of zoom applied is randomised, from between
         :attr:`min_factor` and :attr:`max_factor`. Set these both to the same
@@ -1996,7 +2177,7 @@ class ZoomGroundTruth(Operation):
         :type min_factor: Float
         :type max_factor: Float
         """
-        Operation.__init__(self, probability)
+        Operation.__init__(self, probability, skip_gt_image)
         self.min_factor = min_factor
         self.max_factor = max_factor
 
@@ -2015,13 +2196,20 @@ class ZoomGroundTruth(Operation):
             w, h = image.size
 
             # TODO: Join these two functions together so that we don't have this image_zoom variable lying around.
-            image_zoomed = image.resize((int(round(image.size[0] * factor)), int(round(image.size[1] * factor))), resample=Image.BICUBIC)
+            image_zoomed = image.resize(
+                (int(round(image.size[0] * factor)), int(round(image.size[1] * factor))),
+                resample=Image.BICUBIC,
+            )
             w_zoomed, h_zoomed = image_zoomed.size
 
-            return image_zoomed.crop((floor((float(w_zoomed) / 2) - (float(w) / 2)),
-                                      floor((float(h_zoomed) / 2) - (float(h) / 2)),
-                                      floor((float(w_zoomed) / 2) + (float(w) / 2)),
-                                      floor((float(h_zoomed) / 2) + (float(h) / 2))))
+            return image_zoomed.crop(
+                (
+                    floor((float(w_zoomed) / 2) - (float(w) / 2)),
+                    floor((float(h_zoomed) / 2) - (float(h) / 2)),
+                    floor((float(w_zoomed) / 2) + (float(w) / 2)),
+                    floor((float(h_zoomed) / 2) + (float(h) / 2)),
+                )
+            )
 
         augmented_images = []
 
@@ -2069,7 +2257,8 @@ class Mixup(Operation):
     :math:`\\alpha` result in less *mixup* effect whereas larger values would
     tend to result in overfitting.
     """
-    def __init__(self, probability, alpha=0.4):
+
+    def __init__(self, probability, skip_gt_image, alpha=0.4):
         """
 
         .. note:: Not yet enabled!
@@ -2087,7 +2276,7 @@ class Mixup(Operation):
         :type probability: Float
         :type alpha: Float
         """
-        Operation.__init__(self, probability)
+        Operation.__init__(self, probability, skip_gt_image)
         self.alpha = alpha
 
     def perform_operation(self, images):

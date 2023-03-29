@@ -10,8 +10,7 @@ by adding operations to the pipeline object.
 For a good overview of how to use Augmentor, along with code samples and
 example images, can be seen in the :ref:`mainfeatures` section.
 """
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 from PIL.Image import Image
 from builtins import *
@@ -25,6 +24,7 @@ import random
 import uuid
 import warnings
 import numpy as np
+
 from concurrent.futures import ThreadPoolExecutor
 
 # NOTE:
@@ -84,10 +84,12 @@ class Pipeline(object):
         self.process_ground_truth_images = False
 
         if source_directory is not None:
-            self._populate(source_directory=source_directory,
-                           output_directory=output_directory,
-                           ground_truth_directory=None,
-                           ground_truth_output_directory=output_directory)
+            self._populate(
+                source_directory=source_directory,
+                output_directory=output_directory,
+                ground_truth_directory=None,
+                ground_truth_output_directory=output_directory,
+            )
 
     def __call__(self, augmentor_image):
         """
@@ -104,7 +106,13 @@ class Pipeline(object):
         """
         return self._execute(augmentor_image)
 
-    def _populate(self, source_directory, output_directory, ground_truth_directory, ground_truth_output_directory):
+    def _populate(
+        self,
+        source_directory,
+        output_directory,
+        ground_truth_directory,
+        ground_truth_output_directory,
+    ):
         """
         Private method for populating member variables with AugmentorImage
         objects for each of the images found in the source directory
@@ -171,30 +179,36 @@ class Pipeline(object):
                 try:
                     os.makedirs(abs_output_directory)
                 except IOError:
-                    print("Insufficient rights to read or write output directory (%s)"
-                          % abs_output_directory)
+                    print(
+                        "Insufficient rights to read or write output directory (%s)"
+                        % abs_output_directory
+                    )
         else:
             for class_label in self.class_labels:
                 if not os.path.exists(os.path.join(abs_output_directory, str(class_label[0]))):
                     try:
                         os.makedirs(os.path.join(abs_output_directory, str(class_label[0])))
                     except IOError:
-                        print("Insufficient rights to read or write output directory (%s)"
-                              % abs_output_directory)
+                        print(
+                            "Insufficient rights to read or write output directory (%s)"
+                            % abs_output_directory
+                        )
         for augmentor_image in self.augmentor_images:
             try:
                 with Image.open(augmentor_image.image_path) as opened_image:
                     self.distinct_dimensions.add(opened_image.size)
                     self.distinct_formats.add(opened_image.format)
             except IOError as e:
-                print("There is a problem with image %s in your source directory: %s"
-                      % (augmentor_image.image_path, e.message))
+                print(
+                    "There is a problem with image %s in your source directory: %s"
+                    % (augmentor_image.image_path, e.message)
+                )
                 self.augmentor_images.remove(augmentor_image)
 
         sys.stdout.write("Initialised with %s image(s) found.\n" % len(self.augmentor_images))
         sys.stdout.write("Output directory set to %s." % abs_output_directory)
 
-    def _execute(self, augmentor_image, save_to_disk=True, multi_threaded=True):
+    def _execute(self, augmentor_image, save_to_disk=True, multi_threaded=False):
         """
         Private method. Used to pass an image through the current pipeline,
         and return the augmented image.
@@ -211,26 +225,44 @@ class Pipeline(object):
         :return: The augmented image.
         """
 
+        images_origin = []
+        images_pil = []
+        images_gt = []
         images = []
 
         if augmentor_image.image_path is not None:
-            images.append(Image.open(augmentor_image.image_path))
+            images_origin.append(Image.open(augmentor_image.image_path))
 
         # What if they are array data?
         if augmentor_image.pil_images is not None:
-            images.append(augmentor_image.pil_images)
+            images_pil.append(augmentor_image.pil_images)
 
         if augmentor_image.ground_truth is not None:
             if isinstance(augmentor_image.ground_truth, list):
                 for image in augmentor_image.ground_truth:
-                    images.append(Image.open(image))
+                    images_gt.append(Image.open(image))
             else:
-                images.append(Image.open(augmentor_image.ground_truth))
+                images_gt.append(Image.open(augmentor_image.ground_truth))
+
+        len_images_origin = len(images_origin)
+        len_images_pil = len(images_pil)
+        len_images_gt = len(images_gt)
+
+        images = images_origin + images_pil + images_gt
 
         for operation in self.operations:
             r = round(random.uniform(0, 1), 1)
             if r <= operation.probability:
-                images = operation.perform_operation(images)
+                if operation.skip_gt_image is True:
+                    if len(images) > 0:
+                        images[0 : len_images_origin + len_images_pil] = operation.perform_operation(
+                            images[0 : len_images_origin + len_images_pil]
+                        )
+                else:
+                    if len(images) > 0:
+                        images[0 : len_images_origin + len_images_pil + len_images_gt] = operation.perform_operation(
+                            images[0 : len_images_origin + len_images_pil + len_images_gt]
+                        )
 
         # TEMP FOR TESTING
         # save_to_disk = False
@@ -240,34 +272,50 @@ class Pipeline(object):
             try:
                 for i in range(len(images)):
                     if i == 0:
-                        save_name = augmentor_image.class_label \
-                                    + "_original_" \
-                                    + os.path.basename(augmentor_image.image_path) \
-                                    + "_" \
-                                    + file_name \
-                                    + "." \
-                                    + (self.save_format if self.save_format else augmentor_image.file_format)
+                        save_name = (
+                            augmentor_image.class_label
+                            + "_original_"
+                            + os.path.basename(augmentor_image.image_path)
+                            + "_"
+                            + file_name
+                            + "."
+                            + (
+                                self.save_format
+                                if self.save_format
+                                else augmentor_image.file_format
+                            )
+                        )
 
                         images[i].save(os.path.join(augmentor_image.output_directory, save_name))
 
                     else:
-                        save_name = "_groundtruth_(" \
-                                    + str(i) \
-                                    + ")_" \
-                                    + augmentor_image.class_label \
-                                    + "_" \
-                                    + os.path.basename(augmentor_image.image_path) \
-                                    + "_" \
-                                    + file_name \
-                                    + "." \
-                                    + (self.save_format if self.save_format else augmentor_image.file_format)
+                        save_name = (
+                            "_groundtruth_("
+                            + str(i)
+                            + ")_"
+                            + augmentor_image.class_label
+                            + "_"
+                            + os.path.basename(augmentor_image.image_path)
+                            + "_"
+                            + file_name
+                            + "."
+                            + (
+                                self.save_format
+                                if self.save_format
+                                else augmentor_image.file_format
+                            )
+                        )
 
                         images[i].save(os.path.join(augmentor_image.output_directory, save_name))
 
             except IOError as e:
                 print("Error writing %s, %s. Change save_format to PNG?" % (file_name, e.message))
-                print("You can change the save format using the set_save_format(save_format) function.")
-                print("By passing save_format=\"auto\", Augmentor can save in the correct format automatically.")
+                print(
+                    "You can change the save format using the set_save_format(save_format) function."
+                )
+                print(
+                    "By passing save_format=\"auto\", Augmentor can save in the correct format automatically."
+                )
 
         # TODO: Fix this really strange behaviour.
         # As a workaround, we can pass the same back and basically
@@ -323,7 +371,7 @@ class Pipeline(object):
         else:
             self.save_format = save_format
 
-    def sample(self, n, multi_threaded=True):
+    def sample(self, n, multi_threaded=False):
         """
         Generate :attr:`n` number of samples from the current pipeline.
 
@@ -345,9 +393,11 @@ class Pipeline(object):
         :return: None
         """
         if len(self.augmentor_images) == 0:
-            raise IndexError("There are no images in the pipeline. "
-                             "Add a directory using add_directory(), "
-                             "pointing it to a directory containing images.")
+            raise IndexError(
+                "There are no images in the pipeline. "
+                "Add a directory using add_directory(), "
+                "pointing it to a directory containing images."
+            )
 
         if len(self.operations) == 0:
             raise IndexError("There are no operations associated with this pipeline.")
@@ -359,16 +409,22 @@ class Pipeline(object):
 
         if multi_threaded:
             # TODO: Restore the functionality (appearance of progress bar) from the pre-multi-thread code above.
-            with tqdm(total=len(augmentor_images), desc="Executing Pipeline", unit=" Samples") as progress_bar:
+            with tqdm(
+                total=len(augmentor_images), desc="Executing Pipeline", unit=" Samples"
+            ) as progress_bar:
                 with ThreadPoolExecutor(max_workers=None) as executor:
                     for result in executor.map(self, augmentor_images):
                         progress_bar.set_description("Processing %s" % result)
                         progress_bar.update(1)
         else:
-            with tqdm(total=len(augmentor_images), desc="Executing Pipeline", unit=" Samples") as progress_bar:
+            with tqdm(
+                total=len(augmentor_images), desc="Executing Pipeline", unit=" Samples"
+            ) as progress_bar:
                 for augmentor_image in augmentor_images:
                     self._execute(augmentor_image)
-                    progress_bar.set_description("Processing %s" % os.path.basename(augmentor_image.image_path))
+                    progress_bar.set_description(
+                        "Processing %s" % os.path.basename(augmentor_image.image_path)
+                    )
                     progress_bar.update(1)
 
         # This does not work as it did in the pre-multi-threading code above for some reason.
@@ -388,7 +444,7 @@ class Pipeline(object):
         :return: None
         """
 
-        self.sample(0, multi_threaded=True)
+        self.sample(0, multi_threaded=False)
 
         return None
 
@@ -433,7 +489,7 @@ class Pipeline(object):
         warnings.warn("This function has been deprecated.", DeprecationWarning)
 
         while True:
-            im_index = random.randint(0, len(self.augmentor_images)-1)  # Fix for issue 52.
+            im_index = random.randint(0, len(self.augmentor_images) - 1)  # Fix for issue 52.
             yield self._execute(self.augmentor_images[im_index], save_to_disk=False)
 
     def generator_threading_tests(self, batch_size):
@@ -452,8 +508,10 @@ class Pipeline(object):
 
     def generator_threading_tests_with_matrix_data(self, images, label):
 
-        self.augmentor_images = [AugmentorImage(image_path=None, output_directory=None, pil_images=x, label=y)
-                                 for x, y in zip(images, label)]
+        self.augmentor_images = [
+            AugmentorImage(image_path=None, output_directory=None, pil_images=x, label=y)
+            for x, y in zip(images, label)
+        ]
 
         return 1
 
@@ -517,8 +575,10 @@ class Pipeline(object):
                 # batch[i:i+28]
 
                 # Select random image, get image array and label
-                random_image_index = random.randint(0, len(self.augmentor_images)-1)
-                numpy_array = np.asarray(self._execute(self.augmentor_images[random_image_index], save_to_disk=False))
+                random_image_index = random.randint(0, len(self.augmentor_images) - 1)
+                numpy_array = np.asarray(
+                    self._execute(self.augmentor_images[random_image_index], save_to_disk=False)
+                )
                 label = self.augmentor_images[random_image_index].categorical_label
 
                 # Reshape
@@ -543,11 +603,13 @@ class Pipeline(object):
 
             if scaled:
                 X = X.astype('float32')
-                X /= 255.  # PR #126
+                X /= 255.0  # PR #126
 
             yield (X, y)
 
-    def keras_generator_from_array(self, images, labels, batch_size, scaled=True, image_data_format="channels_last"):
+    def keras_generator_from_array(
+        self, images, labels, batch_size, scaled=True, image_data_format="channels_last"
+    ):
         """
         Returns an image generator that will sample from the current pipeline
         indefinitely, as long as it is called.
@@ -611,7 +673,7 @@ class Pipeline(object):
 
             for i in range(batch_size):
 
-                random_image_index = random.randint(0, len(images)-1)
+                random_image_index = random.randint(0, len(images) - 1)
 
                 # Before passing the image we must format it in a shape that
                 # Pillow can understand, that is either (w, h) for greyscale
@@ -631,9 +693,13 @@ class Pipeline(object):
                 h = images[random_image_index].shape[1]
 
                 if l == 1:
-                    numpy_array = self._execute_with_array(np.reshape(images[random_image_index], (w, h)))
+                    numpy_array = self._execute_with_array(
+                        np.reshape(images[random_image_index], (w, h))
+                    )
                 else:
-                    numpy_array = self._execute_with_array(np.reshape(images[random_image_index], (w, h, l)))
+                    numpy_array = self._execute_with_array(
+                        np.reshape(images[random_image_index], (w, h, l))
+                    )
 
                 if image_data_format == "channels_first":
                     numpy_array = numpy_array.reshape(l, w, h)
@@ -648,9 +714,9 @@ class Pipeline(object):
 
             if scaled:
                 X = X.astype('float32')
-                X /= 255.  # PR #126
+                X /= 255.0  # PR #126
 
-            yield(X, y)
+            yield (X, y)
 
     def keras_preprocess_func(self):
         """
@@ -673,15 +739,17 @@ class Pipeline(object):
 
         :return: The pipeline as a function.
         """
+
         def _transform_keras_preprocess_func(image):
             image = Image.fromarray(np.uint8(255 * image))
             for operation in self.operations:
                 r = random.uniform(0, 1)
                 if r < operation.probability:
                     image = operation.perform_operation([image])[0]
-            #a = AugmentorImage(image_path=None, output_directory=None)
-            #a.image_PIL =
-            return image #self._execute(a)
+            # a = AugmentorImage(image_path=None, output_directory=None)
+            # a.image_PIL =
+            return image  # self._execute(a)
+
         return _transform_keras_preprocess_func
 
     def torch_transform(self):
@@ -702,6 +770,7 @@ class Pipeline(object):
 
         :return: The pipeline as a function.
         """
+
         def _transform(image):
             for operation in self.operations:
                 r = random.uniform(0, 1)
@@ -764,10 +833,12 @@ class Pipeline(object):
         if not os.path.exists(new_source_directory):
             raise IOError("The path does not appear to exist.")
 
-        self._populate(source_directory=new_source_directory,
-                       output_directory=new_output_directory,
-                       ground_truth_directory=None,
-                       ground_truth_output_directory=new_output_directory)
+        self._populate(
+            source_directory=new_source_directory,
+            output_directory=new_output_directory,
+            ground_truth_directory=None,
+            ground_truth_output_directory=new_output_directory,
+        )
 
     def status(self):
         """
@@ -814,7 +885,7 @@ class Pipeline(object):
             print("Classes: %s" % len(label_pairs))
 
             for label_pair in label_pairs:
-                print ("\tClass index: %s Class label: %s " % (label_pair[0], label_pair[1]))
+                print("\tClass index: %s Class label: %s " % (label_pair[0], label_pair[1]))
 
         if len(self.augmentor_images) != 0:
             print("Dimensions: %s" % len(self.distinct_dimensions))
@@ -824,7 +895,9 @@ class Pipeline(object):
             for distinct_format in self.distinct_formats:
                 print("\t %s" % distinct_format)
 
-        print("\nYou can remove operations using the appropriate index and the remove_operation(index) function.")
+        print(
+            "\nYou can remove operations using the appropriate index and the remove_operation(index) function."
+        )
 
     @staticmethod
     def set_seed(seed):
@@ -844,7 +917,7 @@ class Pipeline(object):
     #    # https://patrykchrabaszcz.github.io/Imagenet32/
     #    self.add_operation(Mean(probability=probability))
 
-    def rotate90(self, probability):
+    def rotate90(self, probability, skip_gt_image=False):
         """
         Rotate an image by 90 degrees.
 
@@ -860,9 +933,11 @@ class Pipeline(object):
         if not 0 < probability <= 1:
             raise ValueError(Pipeline._probability_error_text)
         else:
-            self.add_operation(Rotate(probability=probability, rotation=90))
+            self.add_operation(
+                Rotate(probability=probability, rotation=90, skip_gt_image=skip_gt_image)
+            )
 
-    def rotate180(self, probability):
+    def rotate180(self, probability, skip_gt_image=False):
         """
         Rotate an image by 180 degrees.
 
@@ -878,9 +953,11 @@ class Pipeline(object):
         if not 0 < probability <= 1:
             raise ValueError(Pipeline._probability_error_text)
         else:
-            self.add_operation(Rotate(probability=probability, rotation=180))
+            self.add_operation(
+                Rotate(probability=probability, rotation=180, skip_gt_image=skip_gt_image)
+            )
 
-    def rotate270(self, probability):
+    def rotate270(self, probability, skip_gt_image=False):
         """
         Rotate an image by 270 degrees.
 
@@ -896,9 +973,11 @@ class Pipeline(object):
         if not 0 < probability <= 1:
             raise ValueError(Pipeline._probability_error_text)
         else:
-            self.add_operation(Rotate(probability=probability, rotation=270))
+            self.add_operation(
+                Rotate(probability=probability, rotation=270, skip_gt_image=skip_gt_image)
+            )
 
-    def rotate_random_90(self, probability):
+    def rotate_random_90(self, probability, skip_gt_image=False):
         """
         Rotate an image by either 90, 180, or 270 degrees, selected randomly.
 
@@ -918,9 +997,11 @@ class Pipeline(object):
         if not 0 < probability <= 1:
             raise ValueError(Pipeline._probability_error_text)
         else:
-            self.add_operation(Rotate(probability=probability, rotation=-1))
+            self.add_operation(
+                Rotate(probability=probability, rotation=-1, skip_gt_image=skip_gt_image)
+            )
 
-    def rotate(self, probability, max_left_rotation, max_right_rotation):
+    def rotate(self, probability, max_left_rotation, max_right_rotation, skip_gt_image=False):
         """
         Rotate an image by an arbitrary amount.
 
@@ -960,10 +1041,24 @@ class Pipeline(object):
         if not 0 <= max_right_rotation <= 25:
             raise ValueError("The max_right_rotation argument must be between 0 and 25.")
         else:
-            self.add_operation(RotateRange(probability=probability, max_left_rotation=ceil(max_left_rotation),
-                                           max_right_rotation=ceil(max_right_rotation)))
+            self.add_operation(
+                RotateRange(
+                    probability=probability,
+                    max_left_rotation=ceil(max_left_rotation),
+                    max_right_rotation=ceil(max_right_rotation),
+                    skip_gt_image=skip_gt_image,
+                )
+            )
 
-    def rotate_without_crop(self, probability, max_left_rotation, max_right_rotation, expand=False, fillcolor=None):
+    def rotate_without_crop(
+        self,
+        probability,
+        max_left_rotation,
+        max_right_rotation,
+        expand=False,
+        fillcolor=None,
+        skip_gt_image=False,
+    ):
         """
         Rotate an image without automatically cropping.
 
@@ -990,11 +1085,18 @@ class Pipeline(object):
          of int numbers.
         :return: None
         """
-        self.add_operation(RotateStandard(probability=probability, max_left_rotation=ceil(max_left_rotation),
-                                          max_right_rotation=ceil(max_right_rotation), expand=expand,
-                                          fillcolor=fillcolor))
+        self.add_operation(
+            RotateStandard(
+                probability=probability,
+                max_left_rotation=ceil(max_left_rotation),
+                max_right_rotation=ceil(max_right_rotation),
+                expand=expand,
+                fillcolor=fillcolor,
+                skip_gt_image=skip_gt_image,
+            )
+        )
 
-    def flip_top_bottom(self, probability):
+    def flip_top_bottom(self, probability, skip_gt_image=False):
         """
         Flip (mirror) the image along its vertical axis, i.e. from top to
         bottom.
@@ -1009,9 +1111,15 @@ class Pipeline(object):
         if not 0 < probability <= 1:
             raise ValueError(Pipeline._probability_error_text)
         else:
-            self.add_operation(Flip(probability=probability, top_bottom_left_right="TOP_BOTTOM"))
+            self.add_operation(
+                Flip(
+                    probability=probability,
+                    top_bottom_left_right="TOP_BOTTOM",
+                    skip_gt_image=skip_gt_image,
+                )
+            )
 
-    def flip_left_right(self, probability):
+    def flip_left_right(self, probability, skip_gt_image=False):
         """
         Flip (mirror) the image along its horizontal axis, i.e. from left to
         right.
@@ -1026,9 +1134,15 @@ class Pipeline(object):
         if not 0 < probability <= 1:
             raise ValueError(Pipeline._probability_error_text)
         else:
-            self.add_operation(Flip(probability=probability, top_bottom_left_right="LEFT_RIGHT"))
+            self.add_operation(
+                Flip(
+                    probability=probability,
+                    top_bottom_left_right="LEFT_RIGHT",
+                    skip_gt_image=skip_gt_image,
+                )
+            )
 
-    def flip_random(self, probability):
+    def flip_random(self, probability, skip_gt_image=False):
         """
         Flip (mirror) the image along **either** its horizontal or vertical
         axis.
@@ -1044,9 +1158,17 @@ class Pipeline(object):
         if not 0 < probability <= 1:
             raise ValueError(Pipeline._probability_error_text)
         else:
-            self.add_operation(Flip(probability=probability, top_bottom_left_right="RANDOM"))
+            self.add_operation(
+                Flip(
+                    probability=probability,
+                    top_bottom_left_right="RANDOM",
+                    skip_gt_image=skip_gt_image,
+                )
+            )
 
-    def random_distortion(self, probability, grid_width, grid_height, magnitude):
+    def random_distortion(
+        self, probability, grid_width, grid_height, magnitude, skip_gt_image=False
+    ):
         """
         Performs a random, elastic distortion on an image.
 
@@ -1078,11 +1200,30 @@ class Pipeline(object):
         if not 0 < probability <= 1:
             raise ValueError(Pipeline._probability_error_text)
         else:
-            self.add_operation(Distort(probability=probability, grid_width=grid_width,
-                                       grid_height=grid_height, magnitude=magnitude))
+            self.add_operation(
+                Distort(
+                    probability=probability,
+                    grid_width=grid_width,
+                    grid_height=grid_height,
+                    magnitude=magnitude,
+                    skip_gt_image=skip_gt_image,
+                )
+            )
 
-    def gaussian_distortion(self, probability, grid_width, grid_height, magnitude, corner, method, mex=0.5, mey=0.5,
-                            sdx=0.05, sdy=0.05):
+    def gaussian_distortion(
+        self,
+        probability,
+        grid_width,
+        grid_height,
+        magnitude,
+        corner,
+        method,
+        mex=0.5,
+        mey=0.5,
+        sdx=0.05,
+        sdy=0.05,
+        skip_gt_image=False,
+    ):
         """
         Performs a random, elastic gaussian distortion on an image.
 
@@ -1140,13 +1281,23 @@ class Pipeline(object):
         if not 0 < probability <= 1:
             raise ValueError(Pipeline._probability_error_text)
         else:
-            self.add_operation(GaussianDistortion(probability=probability, grid_width=grid_width,
-                                                  grid_height=grid_height,
-                                                  magnitude=magnitude, corner=corner,
-                                                  method=method,  mex=mex,
-                                                  mey=mey, sdx=sdx, sdy=sdy))
+            self.add_operation(
+                GaussianDistortion(
+                    probability=probability,
+                    grid_width=grid_width,
+                    grid_height=grid_height,
+                    magnitude=magnitude,
+                    corner=corner,
+                    method=method,
+                    mex=mex,
+                    mey=mey,
+                    sdx=sdx,
+                    sdy=sdy,
+                    skip_gt_image=skip_gt_image,
+                )
+            )
 
-    def zoom(self, probability, min_factor, max_factor):
+    def zoom(self, probability, min_factor, max_factor, skip_gt_image=False):
         """
         Zoom in to an image, while **maintaining its size**. The amount by
         which the image is zoomed is a randomly chosen value between
@@ -1174,9 +1325,18 @@ class Pipeline(object):
         elif min_factor <= 0:
             raise ValueError("The min_factor argument must be greater than 0.")
         else:
-            self.add_operation(Zoom(probability=probability, min_factor=min_factor, max_factor=max_factor))
+            self.add_operation(
+                Zoom(
+                    probability=probability,
+                    min_factor=min_factor,
+                    max_factor=max_factor,
+                    skip_gt_image=skip_gt_image,
+                )
+            )
 
-    def zoom_random(self, probability, percentage_area, randomise_percentage_area=False):
+    def zoom_random(
+        self, probability, percentage_area, randomise_percentage_area=False, skip_gt_image=False,
+    ):
         """
         Zooms into an image at a random location within the image.
 
@@ -1197,13 +1357,22 @@ class Pipeline(object):
         if not 0 < probability <= 1:
             raise ValueError(Pipeline._probability_error_text)
         elif not 0.1 <= percentage_area < 1:
-            raise ValueError("The percentage_area argument must be greater than 0.1 and less than 1.")
+            raise ValueError(
+                "The percentage_area argument must be greater than 0.1 and less than 1."
+            )
         elif not isinstance(randomise_percentage_area, bool):
             raise ValueError("The randomise_percentage_area argument must be True or False.")
         else:
-            self.add_operation(ZoomRandom(probability=probability, percentage_area=percentage_area, randomise=randomise_percentage_area))
+            self.add_operation(
+                ZoomRandom(
+                    probability=probability,
+                    percentage_area=percentage_area,
+                    randomise=randomise_percentage_area,
+                    skip_gt_image=skip_gt_image,
+                )
+            )
 
-    def crop_by_size(self, probability, width, height, centre=True):
+    def crop_by_size(self, probability, width, height, centre=True, skip_gt_image=False):
         """
         Crop an image according to a set of dimensions.
 
@@ -1239,9 +1408,19 @@ class Pipeline(object):
         elif not isinstance(centre, bool):
             raise ValueError("The centre argument must be True or False.")
         else:
-            self.add_operation(Crop(probability=probability, width=width, height=height, centre=centre))
+            self.add_operation(
+                Crop(
+                    probability=probability,
+                    width=width,
+                    height=height,
+                    centre=centre,
+                    skip_gt_image=skip_gt_image,
+                )
+            )
 
-    def crop_centre(self, probability, percentage_area, randomise_percentage_area=False):
+    def crop_centre(
+        self, probability, percentage_area, randomise_percentage_area=False, skip_gt_image=False,
+    ):
         """
         Crops the centre of an image as a percentage of the image's area.
 
@@ -1260,14 +1439,25 @@ class Pipeline(object):
         if not 0 < probability <= 1:
             raise ValueError(Pipeline._probability_error_text)
         elif not 0.1 <= percentage_area < 1:
-            raise ValueError("The percentage_area argument must be greater than 0.1 and less than 1.")
+            raise ValueError(
+                "The percentage_area argument must be greater than 0.1 and less than 1."
+            )
         elif not isinstance(randomise_percentage_area, bool):
             raise ValueError("The randomise_percentage_area argument must be True or False.")
         else:
-            self.add_operation(CropPercentage(probability=probability, percentage_area=percentage_area, centre=True,
-                                              randomise_percentage_area=randomise_percentage_area))
+            self.add_operation(
+                CropPercentage(
+                    probability=probability,
+                    percentage_area=percentage_area,
+                    centre=True,
+                    randomise_percentage_area=randomise_percentage_area,
+                    skip_gt_image=skip_gt_image,
+                )
+            )
 
-    def crop_random(self, probability, percentage_area, randomise_percentage_area=False):
+    def crop_random(
+        self, probability, percentage_area, randomise_percentage_area=False, skip_gt_image=False,
+    ):
         """
         Crop a random area of an image, based on the percentage area to be
         returned.
@@ -1290,14 +1480,23 @@ class Pipeline(object):
         if not 0 < probability <= 1:
             raise ValueError(Pipeline._probability_error_text)
         elif not 0.1 <= percentage_area < 1:
-            raise ValueError("The percentage_area argument must be greater than 0.1 and less than 1.")
+            raise ValueError(
+                "The percentage_area argument must be greater than 0.1 and less than 1."
+            )
         elif not isinstance(randomise_percentage_area, bool):
             raise ValueError("The randomise_percentage_area argument must be True or False.")
         else:
-            self.add_operation(CropPercentage(probability=probability, percentage_area=percentage_area, centre=False,
-                                              randomise_percentage_area=randomise_percentage_area))
+            self.add_operation(
+                CropPercentage(
+                    probability=probability,
+                    percentage_area=percentage_area,
+                    centre=False,
+                    randomise_percentage_area=randomise_percentage_area,
+                    skip_gt_image=skip_gt_image,
+                )
+            )
 
-    def histogram_equalisation(self, probability=1.0):
+    def histogram_equalisation(self, probability=1.0, skip_gt_image=False):
         """
         Apply histogram equalisation to the image.
 
@@ -1310,9 +1509,11 @@ class Pipeline(object):
         if not 0 < probability <= 1:
             raise ValueError(Pipeline._probability_error_text)
         else:
-            self.add_operation(HistogramEqualisation(probability=probability))
+            self.add_operation(
+                HistogramEqualisation(probability=probability, skip_gt_image=skip_gt_image)
+            )
 
-    def scale(self, probability, scale_factor):
+    def scale(self, probability, scale_factor, skip_gt_image=False):
         """
         Scale (enlarge) an image, while maintaining its aspect ratio. This
         returns an image with larger dimensions than the original image.
@@ -1332,9 +1533,13 @@ class Pipeline(object):
         elif scale_factor <= 1.0:
             raise ValueError("The scale_factor argument must be greater than 1.")
         else:
-            self.add_operation(Scale(probability=probability, scale_factor=scale_factor))
+            self.add_operation(
+                Scale(
+                    probability=probability, scale_factor=scale_factor, skip_gt_image=skip_gt_image
+                )
+            )
 
-    def resize(self, probability, width, height, resample_filter="BICUBIC"):
+    def resize(self, probability, width, height, resample_filter="BICUBIC", skip_gt_image=False):
         """
         Resize an image according to a set of dimensions specified by the
         user in pixels.
@@ -1359,11 +1564,21 @@ class Pipeline(object):
         elif not height > 1:
             raise ValueError("Height must be greater than 1.")
         elif resample_filter not in Pipeline._legal_filters:
-            raise ValueError("The save_filter argument must be one of %s." % Pipeline._legal_filters)
+            raise ValueError(
+                "The save_filter argument must be one of %s." % Pipeline._legal_filters
+            )
         else:
-            self.add_operation(Resize(probability=probability, width=width, height=height, resample_filter=resample_filter))
+            self.add_operation(
+                Resize(
+                    probability=probability,
+                    width=width,
+                    height=height,
+                    resample_filter=resample_filter,
+                    skip_gt_image=skip_gt_image,
+                )
+            )
 
-    def skew_left_right(self, probability, magnitude=1):
+    def skew_left_right(self, probability, magnitude=1, skip_gt_image=False):
         """
         Skew an image by tilting it left or right by a random amount. The
         magnitude of this skew can be set to a maximum using the
@@ -1383,11 +1598,20 @@ class Pipeline(object):
         if not 0 < probability <= 1:
             raise ValueError(Pipeline._probability_error_text)
         elif not 0 < magnitude <= 1:
-            raise ValueError("The magnitude argument must be greater than 0 and less than or equal to 1.")
+            raise ValueError(
+                "The magnitude argument must be greater than 0 and less than or equal to 1."
+            )
         else:
-            self.add_operation(Skew(probability=probability, skew_type="TILT_LEFT_RIGHT", magnitude=magnitude))
+            self.add_operation(
+                Skew(
+                    probability=probability,
+                    skew_type="TILT_LEFT_RIGHT",
+                    magnitude=magnitude,
+                    skip_gt_image=skip_gt_image,
+                )
+            )
 
-    def skew_top_bottom(self, probability, magnitude=1):
+    def skew_top_bottom(self, probability, magnitude=1, skip_gt_image=False):
         """
         Skew an image by tilting it forwards or backwards by a random amount.
         The magnitude of this skew can be set to a maximum using the
@@ -1407,13 +1631,20 @@ class Pipeline(object):
         if not 0 < probability <= 1:
             raise ValueError(Pipeline._probability_error_text)
         elif not 0 < magnitude <= 1:
-            raise ValueError("The magnitude argument must be greater than 0 and less than or equal to 1.")
+            raise ValueError(
+                "The magnitude argument must be greater than 0 and less than or equal to 1."
+            )
         else:
-            self.add_operation(Skew(probability=probability,
-                                    skew_type="TILT_TOP_BOTTOM",
-                                    magnitude=magnitude))
+            self.add_operation(
+                Skew(
+                    probability=probability,
+                    skew_type="TILT_TOP_BOTTOM",
+                    magnitude=magnitude,
+                    skip_gt_image=skip_gt_image,
+                )
+            )
 
-    def skew_tilt(self, probability, magnitude=1):
+    def skew_tilt(self, probability, magnitude=1, skip_gt_image=False):
         """
         Skew an image by tilting in a random direction, either forwards,
         backwards, left, or right, by a random amount. The magnitude of
@@ -1434,13 +1665,20 @@ class Pipeline(object):
         if not 0 < probability <= 1:
             raise ValueError(Pipeline._probability_error_text)
         elif not 0 < magnitude <= 1:
-            raise ValueError("The magnitude argument must be greater than 0 and less than or equal to 1.")
+            raise ValueError(
+                "The magnitude argument must be greater than 0 and less than or equal to 1."
+            )
         else:
-            self.add_operation(Skew(probability=probability,
-                                    skew_type="TILT",
-                                    magnitude=magnitude))
+            self.add_operation(
+                Skew(
+                    probability=probability,
+                    skew_type="TILT",
+                    magnitude=magnitude,
+                    skip_gt_image=skip_gt_image,
+                )
+            )
 
-    def skew_corner(self, probability, magnitude=1):
+    def skew_corner(self, probability, magnitude=1, skip_gt_image=False):
         """
         Skew an image towards one corner, randomly by a random magnitude.
 
@@ -1455,13 +1693,20 @@ class Pipeline(object):
         if not 0 < probability <= 1:
             raise ValueError(Pipeline._probability_error_text)
         elif not 0 < magnitude <= 1:
-            raise ValueError("The magnitude argument must be greater than 0 and less than or equal to 1.")
+            raise ValueError(
+                "The magnitude argument must be greater than 0 and less than or equal to 1."
+            )
         else:
-            self.add_operation(Skew(probability=probability,
-                                    skew_type="CORNER",
-                                    magnitude=magnitude))
+            self.add_operation(
+                Skew(
+                    probability=probability,
+                    skew_type="CORNER",
+                    magnitude=magnitude,
+                    skip_gt_image=skip_gt_image,
+                )
+            )
 
-    def skew(self, probability, magnitude=1):
+    def skew(self, probability, magnitude=1, skip_gt_image=False):
         """
         Skew an image in a random direction, either left to right,
         top to bottom, or one of 8 corner directions.
@@ -1479,13 +1724,20 @@ class Pipeline(object):
         if not 0 < probability <= 1:
             raise ValueError(Pipeline._probability_error_text)
         elif not 0 < magnitude <= 1:
-            raise ValueError("The magnitude argument must be greater than 0 and less than or equal to 1.")
+            raise ValueError(
+                "The magnitude argument must be greater than 0 and less than or equal to 1."
+            )
         else:
-            self.add_operation(Skew(probability=probability,
-                                    skew_type="RANDOM",
-                                    magnitude=magnitude))
+            self.add_operation(
+                Skew(
+                    probability=probability,
+                    skew_type="RANDOM",
+                    magnitude=magnitude,
+                    skip_gt_image=skip_gt_image,
+                )
+            )
 
-    def shear(self, probability, max_shear_left, max_shear_right):
+    def shear(self, probability, max_shear_left, max_shear_right, skip_gt_image=False):
         """
         Shear the image by a specified number of degrees.
 
@@ -1508,11 +1760,16 @@ class Pipeline(object):
         elif not 0 < max_shear_right <= 25:
             raise ValueError("The max_shear_right argument must be between 0 and 25.")
         else:
-            self.add_operation(Shear(probability=probability,
-                                     max_shear_left=max_shear_left,
-                                     max_shear_right=max_shear_right))
+            self.add_operation(
+                Shear(
+                    probability=probability,
+                    max_shear_left=max_shear_left,
+                    max_shear_right=max_shear_right,
+                    skip_gt_image=skip_gt_image,
+                )
+            )
 
-    def greyscale(self, probability):
+    def greyscale(self, probability, skip_gt_image=False):
         """
         Convert images to greyscale. For this operation, setting the
         :attr:`probability` to 1.0 is recommended.
@@ -1528,9 +1785,9 @@ class Pipeline(object):
         if not 0 < probability <= 1:
             raise ValueError(Pipeline._probability_error_text)
         else:
-            self.add_operation(Greyscale(probability=probability))
+            self.add_operation(Greyscale(probability=probability, skip_gt_image=skip_gt_image))
 
-    def black_and_white(self, probability, threshold=128):
+    def black_and_white(self, probability, threshold=128, skip_gt_image=False):
         """
         Convert images to black and white. In other words convert the image
         to use a 1-bit, binary palette. The threshold defaults to 128,
@@ -1554,9 +1811,13 @@ class Pipeline(object):
         elif not 0 <= threshold <= 255:
             raise ValueError("The threshold must be between 0 and 255.")
         else:
-            self.add_operation(BlackAndWhite(probability=probability, threshold=threshold))
+            self.add_operation(
+                BlackAndWhite(
+                    probability=probability, threshold=threshold, skip_gt_image=skip_gt_image
+                )
+            )
 
-    def invert(self, probability):
+    def invert(self, probability, skip_gt_image=False):
         """
         Invert an image. For this operation, setting the
         :attr:`probability` to 1.0 is recommended.
@@ -1572,9 +1833,9 @@ class Pipeline(object):
         if not 0 < probability <= 1:
             raise ValueError(Pipeline._probability_error_text)
         else:
-            self.add_operation(Invert(probability=probability))
+            self.add_operation(Invert(probability=probability, skip_gt_image=skip_gt_image))
 
-    def random_brightness(self,probability,min_factor,max_factor):
+    def random_brightness(self, probability, min_factor, max_factor, skip_gt_image=False):
         """
         Random change brightness of an image.
 
@@ -1593,9 +1854,16 @@ class Pipeline(object):
         elif not min_factor <= max_factor:
             raise ValueError("The max_factor must be bigger min_factor.")
         else:
-            self.add_operation(RandomBrightness(probability=probability, min_factor=min_factor,max_factor=max_factor))
+            self.add_operation(
+                RandomBrightness(
+                    probability=probability,
+                    min_factor=min_factor,
+                    max_factor=max_factor,
+                    skip_gt_image=skip_gt_image,
+                )
+            )
 
-    def random_color(self,probability,min_factor,max_factor):
+    def random_color(self, probability, min_factor, max_factor, skip_gt_image=False):
         """
         Random change saturation of an image.
 
@@ -1614,9 +1882,16 @@ class Pipeline(object):
         elif not min_factor <= max_factor:
             raise ValueError("The max_factor must be bigger min_factor.")
         else:
-            self.add_operation(RandomColor(probability=probability, min_factor=min_factor,max_factor=max_factor))
+            self.add_operation(
+                RandomColor(
+                    probability=probability,
+                    min_factor=min_factor,
+                    max_factor=max_factor,
+                    skip_gt_image=skip_gt_image,
+                )
+            )
 
-    def random_contrast(self,probability,min_factor,max_factor):
+    def random_contrast(self, probability, min_factor, max_factor, skip_gt_image=False):
         """
         Random change image contrast.
 
@@ -1635,9 +1910,16 @@ class Pipeline(object):
         elif not min_factor <= max_factor:
             raise ValueError("The max_factor must be bigger min_factor.")
         else:
-            self.add_operation(RandomContrast(probability=probability, min_factor=min_factor,max_factor=max_factor))
+            self.add_operation(
+                RandomContrast(
+                    probability=probability,
+                    min_factor=min_factor,
+                    max_factor=max_factor,
+                    skip_gt_image=skip_gt_image,
+                )
+            )
 
-    def random_erasing(self, probability, rectangle_area):
+    def random_erasing(self, probability, rectangle_area, skip_gt_image=False):
         """
         Work in progress. This operation performs a Random Erasing operation,
         as described in
@@ -1667,7 +1949,13 @@ class Pipeline(object):
         elif not 0.01 <= rectangle_area <= 1:
             raise ValueError("The rectangle_area must be between 0.01 and 1.")
         else:
-            self.add_operation(RandomErasing(probability=probability, rectangle_area=rectangle_area))
+            self.add_operation(
+                RandomErasing(
+                    probability=probability,
+                    rectangle_area=rectangle_area,
+                    skip_gt_image=skip_gt_image,
+                )
+            )
 
     def ground_truth(self, ground_truth_directory):
         """
@@ -1705,29 +1993,41 @@ class Pipeline(object):
         num_of_ground_truth_images_added = 0
 
         # Progress bar
-        progress_bar = tqdm(total=len(self.augmentor_images), desc="Processing", unit=' Images', leave=False)
+        progress_bar = tqdm(
+            total=len(self.augmentor_images), desc="Processing", unit=' Images', leave=False
+        )
 
         if len(self.class_labels) == 1:
             for augmentor_image_idx in range(len(self.augmentor_images)):
-                ground_truth_image = os.path.join(ground_truth_directory,
-                                                  self.augmentor_images[augmentor_image_idx].image_file_name)
+                ground_truth_image = os.path.join(
+                    ground_truth_directory,
+                    self.augmentor_images[augmentor_image_idx].image_file_name,
+                )
                 if os.path.isfile(ground_truth_image):
                     self.augmentor_images[augmentor_image_idx].ground_truth = ground_truth_image
                     num_of_ground_truth_images_added += 1
         else:
             for i in range(len(self.class_labels)):
                 for augmentor_image_idx in range(len(self.augmentor_images)):
-                    ground_truth_image = os.path.join(ground_truth_directory,
-                                                      self.augmentor_images[augmentor_image_idx].class_label,
-                                                      self.augmentor_images[augmentor_image_idx].image_file_name)
+                    ground_truth_image = os.path.join(
+                        ground_truth_directory,
+                        self.augmentor_images[augmentor_image_idx].class_label,
+                        self.augmentor_images[augmentor_image_idx].image_file_name,
+                    )
                     if os.path.isfile(ground_truth_image):
-                        if self.augmentor_images[augmentor_image_idx].class_label == self.class_labels[i][0]:
+                        if (
+                            self.augmentor_images[augmentor_image_idx].class_label
+                            == self.class_labels[i][0]
+                        ):
                             # Check files are the same size. There may be a better way to do this.
-                            original_image_dimensions = \
-                                Image.open(self.augmentor_images[augmentor_image_idx].image_path).size
+                            original_image_dimensions = Image.open(
+                                self.augmentor_images[augmentor_image_idx].image_path
+                            ).size
                             ground_image_dimensions = Image.open(ground_truth_image).size
                             if original_image_dimensions == ground_image_dimensions:
-                                self.augmentor_images[augmentor_image_idx].ground_truth = ground_truth_image
+                                self.augmentor_images[
+                                    augmentor_image_idx
+                                ].ground_truth = ground_truth_image
                                 num_of_ground_truth_images_added += 1
                                 progress_bar.update(1)
 
@@ -1751,14 +2051,19 @@ class Pipeline(object):
         paths = []
 
         for augmentor_image in self.augmentor_images:
-            print("Image path: %s\nGround truth path: %s\n---\n" % (augmentor_image.image_path, augmentor_image.ground_truth))
+            print(
+                "Image path: %s\nGround truth path: %s\n---\n"
+                % (augmentor_image.image_path, augmentor_image.ground_truth)
+            )
             paths.append((augmentor_image.image_path, augmentor_image.ground_truth))
 
         return paths
 
 
 class DataFramePipeline(Pipeline):
-    def __init__(self, source_dataframe, image_col, category_col, output_directory="output", save_format=None):
+    def __init__(
+        self, source_dataframe, image_col, category_col, output_directory="output", save_format=None
+    ):
         """
         Create a new Pipeline object pointing to dataframe containing the paths
         to your original image dataset.
@@ -1775,16 +2080,18 @@ class DataFramePipeline(Pipeline):
          GIF.
         :return: A :class:`Pipeline` object.
         """
-        super(DataFramePipeline, self).__init__(source_directory=None,
-                                                output_directory=output_directory,
-                                                save_format=save_format)
+        super(DataFramePipeline, self).__init__(
+            source_directory=None, output_directory=output_directory, save_format=save_format
+        )
 
         self._populate(source_dataframe, image_col, category_col, output_directory, save_format)
 
     def _populate(self, source_dataframe, image_col, category_col, output_directory, save_format):
         # Assume we have an absolute path for the output
         # Scan the directory that user supplied.
-        self.augmentor_images, self.class_labels = scan_dataframe(source_dataframe, image_col, category_col, output_directory)
+        self.augmentor_images, self.class_labels = scan_dataframe(
+            source_dataframe, image_col, category_col, output_directory
+        )
 
         self._check_images(output_directory)
 
@@ -1846,7 +2153,7 @@ class DataPipeline(Pipeline):
 
     @augmentor_images.setter
     def augmentor_images(self, value):
-            self._augmentor_images = value
+        self._augmentor_images = value
 
     @property
     def labels(self):
