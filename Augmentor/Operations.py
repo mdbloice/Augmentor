@@ -666,7 +666,10 @@ class RotateStandard(Operation):
             rotation = random_right
 
         def do(image):
-            return image.rotate(rotation, expand=self.expand, resample=Image.BICUBIC, fillcolor=self.fillcolor)
+            # By default, the image.rotate() method rotates the image in the anticlockwise direction for a positive rotation angle.
+            # To rotate the image in the clockwise direction, provide a negative rotation angle.
+            # return image.rotate(rotation, expand=self.expand, resample=Image.BICUBIC, fillcolor=self.fillcolor)
+            return image.rotate(-rotation, expand=self.expand, resample=Image.BICUBIC, fillcolor=self.fillcolor)
 
         augmented_images = []
 
@@ -723,9 +726,15 @@ class Rotate(Operation):
 
         def do(image):
             if self.rotation == -1:
-                return image.rotate(90 * random_factor, expand=True)
+                # By default, the image.rotate() method rotates the image in the anticlockwise direction for a positive rotation angle.
+                # To rotate the image in the clockwise direction, provide a negative rotation angle.
+                # return image.rotate(90 * random_factor, expand=True)
+                return image.rotate(-1*90 * random_factor, expand=True)
             else:
-                return image.rotate(self.rotation, expand=True)
+                # By default, the image.rotate() method rotates the image in the anticlockwise direction for a positive rotation angle.
+                # To rotate the image in the clockwise direction, provide a negative rotation angle.
+                # return image.rotate(self.rotation, expand=True)
+                return image.rotate(-self.rotation, expand=True)
 
         augmented_images = []
 
@@ -812,8 +821,11 @@ class RotateRange(Operation):
             x = image.size[0]
             y = image.size[1]
 
+            # By default, the image.rotate() method rotates the image in the anticlockwise direction for a positive rotation angle.
+            # To rotate the image in the clockwise direction, provide a negative rotation angle.
             # Rotate, while expanding the canvas size
-            image = image.rotate(rotation, expand=True, resample=Image.BICUBIC)
+            # image = image.rotate(rotation, expand=True, resample=Image.BICUBIC)
+            image = image.rotate(-rotation, expand=True, resample=Image.BICUBIC)
 
             # Get size after rotation, which includes the empty space
             X = image.size[0]
