@@ -832,11 +832,11 @@ class RotateRange(Operation):
             angle_b_sin = math.sin(angle_b_rad)
 
             # Find the maximum area of the rectangle that could be cropped
-            E = (math.sin(angle_a_rad)) / (math.sin(angle_b_rad)) * \
-                (Y - X * (math.sin(angle_a_rad) / math.sin(angle_b_rad)))
-            E = E / 1 - (math.sin(angle_a_rad) ** 2 / math.sin(angle_b_rad) ** 2)
-            B = X - E
-            A = (math.sin(angle_a_rad) / math.sin(angle_b_rad)) * B
+            M = y / math.cos(angle_a_rad)
+            x_p = M / (math.tan(angle_a_rad) + y / x)
+            y_p = x_p * y / x
+            E = (X - x_p) / 2
+            A = (Y - y_p) / 2
 
             # Crop this area from the rotated image
             # image = image.crop((E, A, X - E, Y - A))
